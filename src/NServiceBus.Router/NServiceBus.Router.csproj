@@ -36,7 +36,7 @@
   </ItemGroup>
 
   <PropertyGroup>
-    <Description>Allows to connect NServiceBus endpoints running different transports</Description>
+    <Description>Cross-transport, cross-site and possibly cross-cloud router component for NServiceBus</Description>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 </Project>
