@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net461;netcoreapp2.0</TargetFrameworks>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="NServiceBus" Version="7.0.0-*" />
+    <PackageReference Include="NServiceBus.Newtonsoft.Json" Version="2.0.0-*" />
+    <PackageReference Include="NServiceBus.AcceptanceTesting" Version="7.0.0-*" />
+    <PackageReference Include="NUnit" Version="3.7.*" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net461'">
+    <PackageReference Include="NServiceBus.Azure.Transports.WindowsAzureServiceBus" Version="8.0.0-*" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AcceptanceTesting\AcceptanceTesting.csproj" />
+    <ProjectReference Include="..\NServiceBus.Router.Connector\NServiceBus.Router.Connector.csproj" />
+    <ProjectReference Include="..\NServiceBus.Router\NServiceBus.Router.csproj" />
+  </ItemGroup>
+</Project>

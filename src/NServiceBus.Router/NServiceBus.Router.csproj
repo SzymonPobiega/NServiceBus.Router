@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <OutputPath>..\..\binaries</OutputPath>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RootNamespace>NServiceBus.Router</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="SubscriptionStorage\Scripts\Create_MsSqlServer.sql" />
+    <None Remove="SubscriptionStorage\Scripts\Create_MySql.sql" />
+    <None Remove="SubscriptionStorage\Scripts\Create_Oracle.sql" />
+    <None Remove="SubscriptionStorage\Scripts\Create_PostgreSql.sql" />
+    <None Remove="SubscriptionStorage\Scripts\Drop_MsSqlServer.sql" />
+    <None Remove="SubscriptionStorage\Scripts\Drop_MySql.sql" />
+    <None Remove="SubscriptionStorage\Scripts\Drop_Oracle.sql" />
+    <None Remove="SubscriptionStorage\Scripts\Drop_PostgreSql.sql" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="SubscriptionStorage\Scripts\Create_MsSqlServer.sql" />
+    <EmbeddedResource Include="SubscriptionStorage\Scripts\Create_MySql.sql" />
+    <EmbeddedResource Include="SubscriptionStorage\Scripts\Create_Oracle.sql" />
+    <EmbeddedResource Include="SubscriptionStorage\Scripts\Create_PostgreSql.sql" />
+    <EmbeddedResource Include="SubscriptionStorage\Scripts\Drop_MsSqlServer.sql" />
+    <EmbeddedResource Include="SubscriptionStorage\Scripts\Drop_MySql.sql" />
+    <EmbeddedResource Include="SubscriptionStorage\Scripts\Drop_Oracle.sql" />
+    <EmbeddedResource Include="SubscriptionStorage\Scripts\Drop_PostgreSql.sql" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="GitVersionTask" Version="4.0.0-*" PrivateAssets="All" />
+    <PackageReference Include="NServiceBus" Version="[7.0.0-rc0001, 8.0.0)" />
+    <PackageReference Include="NServiceBus.Raw" Version="[3.0.0-rc0002, 4.0.0)" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.4.3" />
+    <PackageReference Include="System.Reflection.Emit" Version="4.3.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <Description>Allows to connect NServiceBus endpoints running different transports</Description>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  </PropertyGroup>
+</Project>

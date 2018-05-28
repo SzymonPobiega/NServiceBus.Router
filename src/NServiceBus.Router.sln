@@ -1,0 +1,61 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.26730.12
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NServiceBus.Router", "NServiceBus.Router\NServiceBus.Router.csproj", "{6307EF93-26B0-4E6C-BA94-85B1DCDCFA07}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NServiceBus.Router.Tests", "NServiceBus.Router.Tests\NServiceBus.Router.Tests.csproj", "{96687744-B1E0-4B98-AD61-ED385014E7AD}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NServiceBus.Router.AcceptanceTests", "NServiceBus.Router.AcceptanceTests\NServiceBus.Router.AcceptanceTests.csproj", "{0D2C045B-B55B-4738-B580-58F259690DF0}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NServiceBus.Router.Connector", "NServiceBus.Router.Connector\NServiceBus.Router.Connector.csproj", "{27325DEC-0BD0-4260-84B5-E0F3D6FCA519}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{2FC95206-1B2A-4F33-9797-8AA059204D2A}"
+	ProjectSection(SolutionItems) = preProject
+		Directory.Build.targets = Directory.Build.targets
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AcceptanceTesting", "AcceptanceTesting\AcceptanceTesting.csproj", "{0F1838F0-4870-45B0-A85C-9197104C6F05}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{3A44ACF0-10D4-4322-976E-364B8ED98602}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6307EF93-26B0-4E6C-BA94-85B1DCDCFA07}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6307EF93-26B0-4E6C-BA94-85B1DCDCFA07}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6307EF93-26B0-4E6C-BA94-85B1DCDCFA07}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6307EF93-26B0-4E6C-BA94-85B1DCDCFA07}.Release|Any CPU.Build.0 = Release|Any CPU
+		{96687744-B1E0-4B98-AD61-ED385014E7AD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{96687744-B1E0-4B98-AD61-ED385014E7AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{96687744-B1E0-4B98-AD61-ED385014E7AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{96687744-B1E0-4B98-AD61-ED385014E7AD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0D2C045B-B55B-4738-B580-58F259690DF0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0D2C045B-B55B-4738-B580-58F259690DF0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0D2C045B-B55B-4738-B580-58F259690DF0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0D2C045B-B55B-4738-B580-58F259690DF0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{27325DEC-0BD0-4260-84B5-E0F3D6FCA519}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{27325DEC-0BD0-4260-84B5-E0F3D6FCA519}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{27325DEC-0BD0-4260-84B5-E0F3D6FCA519}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{27325DEC-0BD0-4260-84B5-E0F3D6FCA519}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0F1838F0-4870-45B0-A85C-9197104C6F05}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0F1838F0-4870-45B0-A85C-9197104C6F05}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0F1838F0-4870-45B0-A85C-9197104C6F05}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0F1838F0-4870-45B0-A85C-9197104C6F05}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{96687744-B1E0-4B98-AD61-ED385014E7AD} = {3A44ACF0-10D4-4322-976E-364B8ED98602}
+		{0D2C045B-B55B-4738-B580-58F259690DF0} = {3A44ACF0-10D4-4322-976E-364B8ED98602}
+		{0F1838F0-4870-45B0-A85C-9197104C6F05} = {3A44ACF0-10D4-4322-976E-364B8ED98602}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F146A5AC-8618-4967-A758-8FB3980BC90F}
+	EndGlobalSection
+EndGlobal
