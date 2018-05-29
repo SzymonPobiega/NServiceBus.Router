@@ -5,7 +5,6 @@ using System.Transactions;
 using NServiceBus.AcceptanceTesting;
 using NServiceBus.AcceptanceTests;
 using NServiceBus.AcceptanceTests.EndpointTemplates;
-using NServiceBus.Router;
 using NServiceBus.Configuration.AdvancedExtensibility;
 using NServiceBus.Serialization;
 using NServiceBus.Settings;
