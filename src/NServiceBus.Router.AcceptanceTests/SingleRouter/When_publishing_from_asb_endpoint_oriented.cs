@@ -118,7 +118,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 {
                     c.DisableFeature<AutoSubscribe>();
                     var routing = c.UseTransport<TestTransport>().BrokerAlpha().Routing();
-                    var ramp = routing.ConnectToBridge("Router");
+                    var ramp = routing.ConnectToRouter("Router");
                     ramp.RegisterPublisher(typeof(MyAsbEvent), PublisherEndpointName);
                     ramp.RouteToEndpoint(typeof(TracerMessage), PublisherEndpointName);
 

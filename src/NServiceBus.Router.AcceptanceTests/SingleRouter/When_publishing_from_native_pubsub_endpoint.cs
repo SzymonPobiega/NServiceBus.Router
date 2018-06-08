@@ -97,7 +97,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 {
                     c.DisableFeature<AutoSubscribe>();
                     var routing = c.UseTransport<TestTransport>().BrokerAlpha().Routing();
-                    var bridge = routing.ConnectToBridge("Router");
+                    var bridge = routing.ConnectToRouter("Router");
                     bridge.RegisterPublisher(typeof(MyBaseEvent1), PublisherEndpoint);
                     bridge.RouteToEndpoint(typeof(TracerMessage), PublisherEndpoint);
                 });
@@ -128,7 +128,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 {
                     c.DisableFeature<AutoSubscribe>();
                     var routing = c.UseTransport<TestTransport>().BrokerAlpha().Routing();
-                    var bridge = routing.ConnectToBridge("Router");
+                    var bridge = routing.ConnectToRouter("Router");
                     bridge.RegisterPublisher(typeof(MyDerivedEvent1), PublisherEndpoint);
                     bridge.RouteToEndpoint(typeof(TracerMessage), PublisherEndpoint);
                 });

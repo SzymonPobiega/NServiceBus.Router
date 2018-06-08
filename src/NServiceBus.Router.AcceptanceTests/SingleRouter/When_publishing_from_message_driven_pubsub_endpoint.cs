@@ -71,7 +71,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 EndpointSetup<DefaultServer>(c =>
                 {
                     var routing = c.UseTransport<TestTransport>().BrokerBravo().Routing();
-                    var bridge = routing.ConnectToBridge("Router");
+                    var bridge = routing.ConnectToRouter("Router");
                     bridge.RegisterPublisher(typeof(MyBaseEvent), Conventions.EndpointNamingConvention(typeof(Publisher)));
                 });
             }
@@ -100,7 +100,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 EndpointSetup<DefaultServer>(c =>
                 {
                     var routing = c.UseTransport<TestTransport>().BrokerBravo().Routing();
-                    var bridge = routing.ConnectToBridge("Router");
+                    var bridge = routing.ConnectToRouter("Router");
                     bridge.RegisterPublisher(typeof(MyDerivedEvent), Conventions.EndpointNamingConvention(typeof(Publisher)));
                 });
             }
