@@ -8,7 +8,6 @@
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <Copyright>Copyright 2017-$([System.DateTime]::UtcNow.ToString(yyyy)) Szymon Pobiega. All rights reserved</Copyright>
     <PackageTags>nservicebus router messages</PackageTags>
-    <PackageIconUrl>https://Router.githubusercontent.com/SzymonPobiega/NServiceBus.Router/master/icons/router.png</PackageIconUrl>
     <PackageProjectUrl>https://github.com/SzymonPobiega/NServiceBus.Router</PackageProjectUrl>
     <PackageOutputPath>..\..\nugets</PackageOutputPath>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>

@@ -2,7 +2,6 @@
 using NServiceBus.AcceptanceTesting;
 using NServiceBus.AcceptanceTests;
 using NServiceBus.AcceptanceTests.EndpointTemplates;
-using NServiceBus.Router;
 using NServiceBus.Features;
 using NUnit.Framework;
 
