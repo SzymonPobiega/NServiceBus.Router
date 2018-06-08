@@ -8,13 +8,13 @@ using NServiceBus.Routing;
 using NServiceBus.Transport;
 using NServiceBus.Unicast.Transport;
 
-class BridgeUnsubscribeBehavior : Behavior<IUnsubscribeContext>
+class RouterUnsubscribeBehavior : Behavior<IUnsubscribeContext>
 {
-    public BridgeUnsubscribeBehavior(string subscriberAddress, string subscriberEndpoint, string bridgeAddress, IDispatchMessages dispatcher, Dictionary<Type, string> publisherTable, bool invokeTerminator)
+    public RouterUnsubscribeBehavior(string subscriberAddress, string subscriberEndpoint, string routerAddress, IDispatchMessages dispatcher, Dictionary<Type, string> publisherTable, bool invokeTerminator)
     {
         this.subscriberAddress = subscriberAddress;
         this.subscriberEndpoint = subscriberEndpoint;
-        this.bridgeAddress = bridgeAddress;
+        this.routerAddress = routerAddress;
         this.dispatcher = dispatcher;
         this.publisherTable = publisherTable;
         this.invokeTerminator = invokeTerminator;
@@ -25,7 +25,7 @@ class BridgeUnsubscribeBehavior : Behavior<IUnsubscribeContext>
         var eventType = context.EventType;
         if (publisherTable.TryGetValue(eventType, out var publisherEndpoint))
         {
-            Logger.Debug($"Sending unsubscribe request for {eventType.AssemblyQualifiedName} to bridge queue {bridgeAddress} to be forwarded to {publisherEndpoint}");
+            Logger.Debug($"Sending unsubscribe request for {eventType.AssemblyQualifiedName} to router queue {routerAddress} to be forwarded to {publisherEndpoint}");
 
             var subscriptionMessage = ControlMessageFactory.Create(MessageIntentEnum.Unsubscribe);
 
@@ -37,7 +37,7 @@ class BridgeUnsubscribeBehavior : Behavior<IUnsubscribeContext>
             subscriptionMessage.Headers[Headers.TimeSent] = DateTimeExtensions.ToWireFormattedString(DateTime.UtcNow);
             subscriptionMessage.Headers[Headers.NServiceBusVersion] = "6.3.1"; //The code has been copied from 6.3.1
 
-            var transportOperation = new TransportOperation(subscriptionMessage, new UnicastAddressTag(bridgeAddress));
+            var transportOperation = new TransportOperation(subscriptionMessage, new UnicastAddressTag(routerAddress));
             var transportTransaction = context.Extensions.GetOrCreate<TransportTransaction>();
             await dispatcher.Dispatch(new TransportOperations(transportOperation), transportTransaction, context.Extensions).ConfigureAwait(false);
         }
@@ -52,7 +52,7 @@ class BridgeUnsubscribeBehavior : Behavior<IUnsubscribeContext>
     bool invokeTerminator;
     string subscriberAddress;
     string subscriberEndpoint;
-    string bridgeAddress;
+    string routerAddress;
 
-    static ILog Logger = LogManager.GetLogger<BridgeUnsubscribeBehavior>();
+    static ILog Logger = LogManager.GetLogger<RouterUnsubscribeBehavior>();
 }

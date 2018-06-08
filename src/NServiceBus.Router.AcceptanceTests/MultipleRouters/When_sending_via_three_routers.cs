@@ -57,7 +57,7 @@ public class When_sending_via_three_routers : NServiceBusAcceptanceTest
             EndpointSetup<DefaultServer>(c =>
             {
                 var routing = c.UseTransport<TestTransport>().BrokerAlpha().Routing();
-                var bridge = routing.ConnectToBridge("Green-Blue");
+                var bridge = routing.ConnectToRouter("Green-Blue");
                 bridge.RouteToEndpoint(typeof(MyRequest), Conventions.EndpointNamingConvention(typeof(Receiver)));
             });
         }

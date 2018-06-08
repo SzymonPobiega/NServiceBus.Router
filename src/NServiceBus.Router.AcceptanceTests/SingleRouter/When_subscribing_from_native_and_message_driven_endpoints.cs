@@ -99,7 +99,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 EndpointSetup<DefaultServer>(c =>
                 {
                     var routing = c.UseTransport<TestTransport>().BrokerAlpha().Routing();
-                    var bridge = routing.ConnectToBridge("Router");
+                    var bridge = routing.ConnectToRouter("Router");
                     bridge.RegisterPublisher(typeof(MyBaseEvent3), PublisherEndpoint);
                     bridge.RouteToEndpoint(typeof(TracerMessage), PublisherEndpoint);
                 });
@@ -131,7 +131,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                     var routing = c.UseTransport<TestTransport>().BrokerZulu()
                         .Routing();
 
-                    var bridge = routing.ConnectToBridge("Router");
+                    var bridge = routing.ConnectToRouter("Router");
                     bridge.RegisterPublisher(typeof(MyDerivedEvent3), PublisherEndpoint);
                     bridge.RouteToEndpoint(typeof(TracerMessage), PublisherEndpoint);
                 });

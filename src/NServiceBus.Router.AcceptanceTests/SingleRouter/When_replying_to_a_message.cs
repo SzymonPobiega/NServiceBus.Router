@@ -44,7 +44,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 EndpointSetup<DefaultServer>(c =>
                 {
                     var routing = c.UseTransport<TestTransport>().BrokerAlpha().Routing();
-                    var bridge = routing.ConnectToBridge("Router");
+                    var bridge = routing.ConnectToRouter("Router");
                     bridge.RouteToEndpoint(typeof(MyRequest), Conventions.EndpointNamingConvention(typeof(Receiver)));
                 });
             }

@@ -67,7 +67,7 @@ namespace NServiceBus.Router.AcceptanceTests.MultipleRouters
                 EndpointSetup<DefaultServer>(c =>
                 {
                     var routing = c.UseTransport<TestTransport>().BrokerCharlie().Routing();
-                    var bridge = routing.ConnectToBridge("Blue-Red");
+                    var bridge = routing.ConnectToRouter("Blue-Red");
                     bridge.RegisterPublisher(typeof(MyEvent), Conventions.EndpointNamingConvention(typeof(Publisher)));
                 });
             }

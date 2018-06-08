@@ -71,7 +71,7 @@ namespace NServiceBus.Router.AcceptanceTests.MultipleRouters
                 EndpointSetup<DefaultServer>(c =>
                 {
                     var routing = c.UseTransport<TestTransport>().BrokerAlpha().Routing();
-                    var bridge = routing.ConnectToBridge("Green-Blue");
+                    var bridge = routing.ConnectToRouter("Green-Blue");
                     bridge.RouteToEndpoint(typeof(GreenRequest), Conventions.EndpointNamingConvention(typeof(RedEndpoint)));
                 });
             }
@@ -116,7 +116,7 @@ namespace NServiceBus.Router.AcceptanceTests.MultipleRouters
                 EndpointSetup<DefaultServer>(c =>
                 {
                     var routing = c.UseTransport<TestTransport>().BrokerCharlie().Routing();
-                    var bridge = routing.ConnectToBridge("Red-Blue");
+                    var bridge = routing.ConnectToRouter("Red-Blue");
                     bridge.RouteToEndpoint(typeof(RedRequest), Conventions.EndpointNamingConvention(typeof(GreenEndpoint)));
                 });
             }
