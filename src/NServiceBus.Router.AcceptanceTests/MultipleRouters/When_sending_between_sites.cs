@@ -84,7 +84,7 @@ namespace NServiceBus.Router.AcceptanceTests.MultipleRouters
                 EndpointSetup<DefaultServer>(c =>
                 {
                     var routing = c.UseTransport<TestTransport>().BrokerAlpha().Routing();
-                    var bridge = routing.ConnectToBridge("Green-Yellow");
+                    var bridge = routing.ConnectToRouter("Green-Yellow");
                     bridge.RouteToEndpoint(typeof(MyRequest), ReceiverEndpoint);
                 });
             }

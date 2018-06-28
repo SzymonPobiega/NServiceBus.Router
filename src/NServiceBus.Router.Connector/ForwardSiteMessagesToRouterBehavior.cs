@@ -7,13 +7,13 @@ namespace NServiceBus
     using Pipeline;
     using Routing;
 
-    class RouteSiteMessagesToBridgeBehavior : Behavior<IRoutingContext>
+    class ForwardSiteMessagesToRouterBehavior : Behavior<IRoutingContext>
     {
-        string bridgeAddress;
+        string routerAddress;
 
-        public RouteSiteMessagesToBridgeBehavior(string bridgeAddress)
+        public ForwardSiteMessagesToRouterBehavior(string routerAddress)
         {
-            this.bridgeAddress = bridgeAddress;
+            this.routerAddress = routerAddress;
         }
 
         public override Task Invoke(IRoutingContext context, Func<Task> next)
@@ -27,7 +27,7 @@ namespace NServiceBus
                 throw new Exception("Site name cannot contain a semicolon.");
             }
 
-            var newRoutingStrategies = context.RoutingStrategies.Select(s => (RoutingStrategy)new SiteRoutingStrategy(bridgeAddress, state.Sites));
+            var newRoutingStrategies = context.RoutingStrategies.Select(s => (RoutingStrategy)new SiteRoutingStrategy(routerAddress, state.Sites));
             context.RoutingStrategies = newRoutingStrategies.ToArray();
             return next();
         }
@@ -39,19 +39,19 @@ namespace NServiceBus
 
         class SiteRoutingStrategy : RoutingStrategy
         {
-            public SiteRoutingStrategy(string bridgeAddress, string[] sites)
+            public SiteRoutingStrategy(string routerAddress, string[] sites)
             {
-                this.bridgeAddress = bridgeAddress;
+                this.routerAddress = routerAddress;
                 this.sites = sites;
             }
 
             public override AddressTag Apply(Dictionary<string, string> headers)
             {
                 headers["NServiceBus.Bridge.DestinationSites"] = string.Join(";", sites);
-                return new UnicastAddressTag(bridgeAddress);
+                return new UnicastAddressTag(routerAddress);
             }
 
-            string bridgeAddress;
+            string routerAddress;
             string[] sites;
         }
     }

@@ -17,7 +17,7 @@ namespace NServiceBus
             {
                 throw new Exception("When sending to sites at least one site name has to be specified.");
             }
-            var state = options.GetExtensions().GetOrCreate<RouteSiteMessagesToBridgeBehavior.State>();
+            var state = options.GetExtensions().GetOrCreate<ForwardSiteMessagesToRouterBehavior.State>();
             state.Sites = sites;
         }
     }

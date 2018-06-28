@@ -75,7 +75,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                     var routing = c.UseTransport<TestTransport>().BrokerYankee()
                         .Routing();
 
-                    var ramp = routing.ConnectToBridge("Router");
+                    var ramp = routing.ConnectToRouter("Router");
                     ramp.RegisterPublisher(typeof(MyBaseEvent2), PublisherEndpoint);
                 });
             }
@@ -106,7 +106,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                     var routing = c.UseTransport<TestTransport>().BrokerYankee()
                         .Routing();
 
-                    var ramp = routing.ConnectToBridge("Router");
+                    var ramp = routing.ConnectToRouter("Router");
                     ramp.RegisterPublisher(typeof(MyDerivedEvent2), PublisherEndpoint);
                 });
             }

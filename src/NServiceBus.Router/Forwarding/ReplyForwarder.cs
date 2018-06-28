@@ -15,7 +15,7 @@ class ReplyForwarder
         string replyTo = null;
         if (!forwardedHeaders.TryGetValue(Headers.CorrelationId, out var correlationId))
         {
-            throw new UnforwardableMessageException($"The reply has to contain a '{Headers.CorrelationId}' header set by the bridge ramp when sending out the initial message.");
+            throw new UnforwardableMessageException($"The reply has to contain a '{Headers.CorrelationId}' header set by the router connector when sending out the initial message.");
         }
 
         correlationId.DecodeTLV((t, v) =>

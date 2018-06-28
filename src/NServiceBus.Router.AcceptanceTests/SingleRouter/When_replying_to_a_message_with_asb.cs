@@ -66,7 +66,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 EndpointSetup<DefaultServer>(c =>
                 {
                     var routing = c.UseTransport<TestTransport>().BrokerAlpha().Routing();
-                    var ramp = routing.ConnectToBridge("Router");
+                    var ramp = routing.ConnectToRouter("Router");
                     ramp.RouteToEndpoint(typeof(MyRequest), Conventions.EndpointNamingConvention(typeof(Receiver)));
                 });
             }
