@@ -14,7 +14,7 @@ class RoutingHeadersBehavior : Behavior<IOutgoingSendContext>
 
     public override Task Invoke(IOutgoingSendContext context, Func<Task> next)
     {
-        if (routeTable.TryGetValue(context.Message.MessageType, out var ultimateDestination))
+        if (routeTable.TryGetValue(context.Message.MessageType, out var ultimateDestination) && ultimateDestination != null)
         {
             context.Headers["NServiceBus.Bridge.DestinationEndpoint"] = ultimateDestination;
         }

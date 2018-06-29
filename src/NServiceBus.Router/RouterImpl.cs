@@ -8,10 +8,11 @@ using NServiceBus.Transport;
 
 class RouterImpl : IRouter
 {
-    public RouterImpl(string name, Interface[] interfaces, IRoutingProtocol routingProtocol)
+    public RouterImpl(string name, Interface[] interfaces, IRoutingProtocol routingProtocol, FindDestinations findDestinations)
     {
         this.name = name;
         this.routingProtocol = routingProtocol;
+        this.findDestinations = findDestinations ?? FindDestinationsByHeaders;
         this.interfaces = interfaces.ToDictionary(x => x.Name, x => x);
     }
 
@@ -31,7 +32,9 @@ class RouterImpl : IRouter
             case MessageIntentEnum.Subscribe:
             case MessageIntentEnum.Unsubscribe:
             case MessageIntentEnum.Send:
-                var outgoingInterfaces = routingProtocol.RouteTable.GetOutgoingInterfaces(incomingIface, msg);
+                var destinations = findDestinations(msg).ToArray();
+                msg.Extensions.Set(destinations);
+                var outgoingInterfaces = routingProtocol.RouteTable.GetOutgoingInterfaces(incomingIface, destinations);
                 var forwardTasks = outgoingInterfaces.Select(i => GetInterface(i).Forward(incomingIface, msg));
                 return Task.WhenAll(forwardTasks.ToArray());
             case MessageIntentEnum.Publish:
@@ -40,6 +43,28 @@ class RouterImpl : IRouter
                 return GetInterface(InterfaceForReply(msg)).Forward(incomingIface, msg);
             default:
                 throw new UnforwardableMessageException("Not supported message intent: " + intent);
+        }
+    }
+
+    static IEnumerable<Destination> FindDestinationsByHeaders(MessageContext context)
+    {
+        context.Headers.TryGetValue("NServiceBus.Bridge.DestinationEndpoint", out var destinationEndpoint);
+        
+        if (!context.Headers.TryGetValue("NServiceBus.Bridge.DestinationSites", out var sites))
+        {
+            if (destinationEndpoint == null)
+            {
+                throw new UnforwardableMessageException("Either 'NServiceBus.Bridge.DestinationEndpoint' or 'NServiceBus.Bridge.DestinationSites' is required to forward a message.");
+            }
+            var dest = new Destination(destinationEndpoint, null);
+            yield return dest;
+            yield break;
+        }
+        var siteArray = sites.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var s in siteArray)
+        {
+            var dest = new Destination(destinationEndpoint, s);
+            yield return dest;
         }
     }
 
@@ -108,5 +133,6 @@ class RouterImpl : IRouter
 
     string name;
     IRoutingProtocol routingProtocol;
+    FindDestinations findDestinations;
     Dictionary<string, Interface> interfaces;
 }

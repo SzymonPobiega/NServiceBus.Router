@@ -21,7 +21,8 @@ class SendForwarder
 
     public Task Forward(string incomingInterface, MessageContext context, IRawEndpoint dispatcher, RouteTable routeTable)
     {
-        var routes = routeTable.Route(incomingInterface, context);
+        var destinations = context.Extensions.Get<Destination[]>();
+        var routes = routeTable.Route(incomingInterface, destinations);
 
         TransportOperation Forward(Route r)
         {
