@@ -16,11 +16,6 @@ abstract class SubscriptionForwarder
             throw new UnforwardableMessageException("Message intent is Subscribe, but the subscription message type header is missing.");
         }
 
-        if (intent != MessageIntentEnum.Subscribe && intent != MessageIntentEnum.Unsubscribe)
-        {
-            throw new UnforwardableMessageException("Subscription messages need to have intent set to Subscribe/Unsubscribe.");
-        }
-
         string subscriberEndpoint = null;
 
         context.Headers.TryGetValue("NServiceBus.Bridge.DestinationEndpoint", out var publisherEndpoint);

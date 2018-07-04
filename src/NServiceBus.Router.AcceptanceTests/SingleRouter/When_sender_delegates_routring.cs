@@ -4,12 +4,12 @@ using NServiceBus.AcceptanceTests;
 using NServiceBus.AcceptanceTests.EndpointTemplates;
 using NUnit.Framework;
 
-namespace NServiceBus.Router.AcceptanceTests.MultipleRouters
+namespace NServiceBus.Router.AcceptanceTests.SingleRouter
 {
     using AcceptanceTesting.Customization;
 
     [TestFixture]
-    public class When_sender_does_not_specify_destination : NServiceBusAcceptanceTest
+    public class When_sender_delegates_routring : NServiceBusAcceptanceTest
     {
         static string ReceiverEndpoint => Conventions.EndpointNamingConvention(typeof(Receiver));
 
@@ -17,28 +17,15 @@ namespace NServiceBus.Router.AcceptanceTests.MultipleRouters
         public async Task Should_use_custom_destination_finder_on_router()
         {
             var result = await Scenario.Define<Context>()
-                .WithRouter("Green-Blue", cfg =>
+                .WithRouter("Router", cfg =>
                 {
-                    cfg.AddInterface<TestTransport>("Green", t => t.BrokerAlpha()).InMemorySubscriptions();
-                    cfg.AddInterface<TestTransport>("Blue", t => t.BrokerBravo()).InMemorySubscriptions();
+                    cfg.AddInterface<TestTransport>("Left", t => t.BrokerAlpha()).InMemorySubscriptions();
+                    cfg.AddInterface<TestTransport>("Right", t => t.BrokerBravo()).InMemorySubscriptions();
 
-                    cfg.UseStaticRoutingProtocol().AddRoute((iface, destination) => destination.Site == "MySite", "Site = MySite", "Blue-Red", "Blue");
+                    cfg.UseStaticRoutingProtocol().AddForwardRoute("Left", "Right");
+                    cfg.FindDestinationsUsing(message => new[]{new Destination(ReceiverEndpoint, null)});
                 })
-                .WithRouter("Blue-Red", cfg =>
-                {
-                    cfg.AddInterface<TestTransport>("Blue", t => t.BrokerBravo()).InMemorySubscriptions();
-                    cfg.AddInterface<TestTransport>("Red", t => t.BrokerCharlie()).InMemorySubscriptions();
-
-                    var staticRouting = cfg.UseStaticRoutingProtocol();
-                    staticRouting.AddForwardRoute("Blue", "Red");
-                    cfg.FindDestinationsUsing(message => new [] {new Destination(ReceiverEndpoint, null) });
-                })
-                .WithEndpoint<Sender>(c => c.When(s =>
-                {
-                    var ops = new SendOptions();
-                    ops.SendToSites("MySite");
-                    return s.Send(new MyRequest(), ops);
-                }))
+                .WithEndpoint<Sender>(c => c.When(s => s.Send(new MyRequest())))
                 .WithEndpoint<Receiver>()
                 .Done(c => c.RequestReceived && c.ResponseReceived)
                 .Run();
@@ -60,7 +47,7 @@ namespace NServiceBus.Router.AcceptanceTests.MultipleRouters
                 EndpointSetup<DefaultServer>(c =>
                 {
                     var routing = c.UseTransport<TestTransport>().BrokerAlpha().Routing();
-                    var router = routing.ConnectToRouter("Green-Blue");
+                    var router = routing.ConnectToRouter("Router");
                     router.DelegateRouting(typeof(MyRequest));
                 });
             }
@@ -89,7 +76,7 @@ namespace NServiceBus.Router.AcceptanceTests.MultipleRouters
                 EndpointSetup<DefaultServer>(c =>
                 {
                     //No bridge configuration needed for reply
-                    c.UseTransport<TestTransport>().BrokerCharlie();
+                    c.UseTransport<TestTransport>().BrokerBravo();
                 });
             }
 

@@ -4,17 +4,15 @@ using NServiceBus.AcceptanceTests;
 using NServiceBus.AcceptanceTests.EndpointTemplates;
 using NUnit.Framework;
 
-namespace NServiceBus.Router.AcceptanceTests.SingleRouter
+namespace NServiceBus.Router.AcceptanceTests.Poison
 {
-    using AcceptanceTesting.Customization;
+    using System.Linq;
 
     [TestFixture]
     public class When_sender_does_not_specify_destination : NServiceBusAcceptanceTest
     {
-        static string ReceiverEndpoint => Conventions.EndpointNamingConvention(typeof(Receiver));
-
         [Test]
-        public async Task Should_use_custom_destination_finder_on_router()
+        public async Task Should_move_message_to_poison_queue()
         {
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
@@ -23,21 +21,24 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                     cfg.AddInterface<TestTransport>("Right", t => t.BrokerBravo()).InMemorySubscriptions();
 
                     cfg.UseStaticRoutingProtocol().AddForwardRoute("Left", "Right");
-                    cfg.FindDestinationsUsing(message => new[]{new Destination(ReceiverEndpoint, null)});
                 })
-                .WithEndpoint<Sender>(c => c.When(s => s.Send(new MyRequest())))
+                .WithEndpoint<Sender>(c => c.When(s => s.Send(new PoisonMessage())))
                 .WithEndpoint<Receiver>()
-                .Done(c => c.RequestReceived && c.ResponseReceived)
+                .WithPosionSpyComponent(t => t.BrokerAlpha())
+                .Done(c => c.PoisonMessageDetected || c.RequestReceived)
                 .Run();
 
-            Assert.IsTrue(result.RequestReceived);
-            Assert.IsTrue(result.ResponseReceived);
+            Assert.IsFalse(result.RequestReceived);
+            Assert.IsTrue(result.PoisonMessageDetected);
+            Assert.AreEqual("Either \'NServiceBus.Bridge.DestinationEndpoint\' or \'NServiceBus.Bridge.DestinationSites\' is required to forward a message.", result.ExceptionMessage);
+            Assert.IsTrue(result.Logs.Any(l => l.Message.Contains(result.ExceptionMessage)));
         }
 
-        class Context : ScenarioContext
+        class Context : ScenarioContext, IPoisonSpyContext
         {
             public bool RequestReceived { get; set; }
-            public bool ResponseReceived { get; set; }
+            public string ExceptionMessage { get; set; }
+            public bool PoisonMessageDetected { get; set; }
         }
 
         class Sender : EndpointConfigurationBuilder
@@ -48,24 +49,8 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 {
                     var routing = c.UseTransport<TestTransport>().BrokerAlpha().Routing();
                     var router = routing.ConnectToRouter("Router");
-                    router.DelegateRouting(typeof(MyRequest));
+                    router.DelegateRouting(typeof(PoisonMessage));
                 });
-            }
-
-            class MyResponseHandler : IHandleMessages<MyResponse>
-            {
-                Context scenarioContext;
-
-                public MyResponseHandler(Context scenarioContext)
-                {
-                    this.scenarioContext = scenarioContext;
-                }
-
-                public Task Handle(MyResponse response, IMessageHandlerContext context)
-                {
-                    scenarioContext.ResponseReceived = true;
-                    return Task.CompletedTask;
-                }
             }
         }
 
@@ -80,7 +65,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 });
             }
 
-            class MyRequestHandler : IHandleMessages<MyRequest>
+            class MyRequestHandler : IHandleMessages<PoisonMessage>
             {
                 Context scenarioContext;
 
@@ -89,19 +74,15 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                     this.scenarioContext = scenarioContext;
                 }
 
-                public Task Handle(MyRequest request, IMessageHandlerContext context)
+                public Task Handle(PoisonMessage request, IMessageHandlerContext context)
                 {
                     scenarioContext.RequestReceived = true;
-                    return context.Reply(new MyResponse());
+                    return Task.CompletedTask;
                 }
             }
         }
 
-        class MyRequest : IMessage
-        {
-        }
-
-        class MyResponse : IMessage
+        class PoisonMessage : IMessage
         {
         }
     }

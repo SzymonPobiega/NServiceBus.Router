@@ -72,13 +72,25 @@ class RouterImpl : IRouter
     {
         if (msg.Headers.TryGetValue("NServiceBus.Bridge.Trace", out var trace))
         {
-            trace.DecodeTLV((t, v) =>
+            var cycleDetected = false;
+            try
             {
-                if (t == "via" && v == name) //We forwarded this message
+                trace.DecodeTLV((t, v) =>
                 {
-                    throw new UnforwardableMessageException("Routing cycle detected: " + trace);
-                }
-            });
+                    if (t == "via" && v == name) //We forwarded this message
+                    {
+                        cycleDetected = true;
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                throw new UnforwardableMessageException($"Cannot decode value in \'NServiceBus.Bridge.Trace\' header: {ex.Message}");
+            }
+            if (cycleDetected)
+            {
+                throw new UnforwardableMessageException($"Routing cycle detected: {trace}");
+            }
         }
     }
 
@@ -115,13 +127,20 @@ class RouterImpl : IRouter
         {
             throw new UnforwardableMessageException($"The reply has to contain a '{Headers.CorrelationId}' header set by the sending endpoint when sending out the initial message.");
         }
-        correlationId.DecodeTLV((t, v) =>
+        try
         {
-            if (t == "iface" || t == "port") //Port for compat reasons
+            correlationId.DecodeTLV((t, v) =>
             {
-                destinationIface = v;
-            }
-        });
+                if (t == "iface" || t == "port") //Port for compat reasons
+                {
+                    destinationIface = v;
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            throw new UnforwardableMessageException($"Cannot decode value in \'{Headers.CorrelationId}\' header: {e.Message}");
+        }
 
         if (destinationIface == null)
         {
