@@ -6,7 +6,6 @@ using NServiceBus.AcceptanceTesting;
 using NServiceBus.AcceptanceTesting.Support;
 using NServiceBus.Router;
 
-
 class RouterComponent : IComponentBehavior
 {
     Func<ScenarioContext, RouterConfiguration> configCallback;

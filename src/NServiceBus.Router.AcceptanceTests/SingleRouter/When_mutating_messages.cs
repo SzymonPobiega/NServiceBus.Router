@@ -17,6 +17,8 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
     [TestFixture]
     public class When_mutating_messages : NServiceBusAcceptanceTest
     {
+        static JsonSerializer jsonSerializer = new JsonSerializer();
+
         [Test]
         public async Task Receiver_should_see_modified_body()
         {
@@ -35,25 +37,9 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                             return dispatch(ops, transaction, context);
                         }
 
-                        MyMessage deserialized;
-                        using (var stream = new MemoryStream(op.Message.Body))
-                        {
-                            using (var streamReader = new StreamReader(stream, Encoding.UTF8))
-                            {
-                                using (var jsonReader = new JsonTextReader(streamReader))
-                                {
-                                    var serializer = new JsonSerializer();
-                                    deserialized = serializer.Deserialize<MyMessage>(jsonReader);
-                                }
-                            }
-                        }
-
-                        var toSerialize = new MyMessage
-                        {
-                            Number = deserialized.Number + 2
-                        };
-
-                        var serialized = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(toSerialize));
+                        var deserialized = DeserializeMessage(op.Message.Body, jsonSerializer);
+                        deserialized.Number += 2;
+                        var serialized = SerializeMessage(deserialized, jsonSerializer);
 
                         var newMessage = new OutgoingMessage(op.Message.MessageId, op.Message.Headers, serialized);
                         var newOp = new TransportOperation(newMessage, new UnicastAddressTag(op.Destination), op.RequiredDispatchConsistency, op.DeliveryConstraints);
@@ -71,6 +57,39 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 .Run();
 
             Assert.AreEqual(44, result.ValueReceived);
+        }
+
+        static MyMessage DeserializeMessage(byte[] body, JsonSerializer serializer)
+        {
+            MyMessage deserialized;
+            using (var stream = new MemoryStream(body))
+            {
+                using (var streamReader = new StreamReader(stream, Encoding.UTF8))
+                {
+                    using (var jsonReader = new JsonTextReader(streamReader))
+                    {
+                        deserialized = serializer.Deserialize<MyMessage>(jsonReader);
+                    }
+                }
+            }
+
+            return deserialized;
+        }
+
+        static byte[] SerializeMessage(MyMessage message, JsonSerializer serializer)
+        {
+            using (var stream = new MemoryStream())
+            {
+                using (var streamWriter = new StreamWriter(stream, Encoding.UTF8))
+                {
+                    using (var jsonWriter = new JsonTextWriter(streamWriter))
+                    {
+                        serializer.Serialize(jsonWriter, message);
+                    }
+                }
+
+                return stream.ToArray();
+            }
         }
 
         class Context : ScenarioContext

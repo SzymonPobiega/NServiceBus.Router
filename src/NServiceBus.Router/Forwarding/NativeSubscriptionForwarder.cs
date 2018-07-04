@@ -43,7 +43,8 @@ class NativeSubscriptionForwarder : SubscriptionForwarder
 
     async Task Send(string incomingInterface, MessageContext context, Subscriber subscriber, string messageType, MessageIntentEnum intent, IRawEndpoint dispatcher, RouteTable routeTable)
     {
-        var routes = routeTable.Route(incomingInterface, context);
+        var destinations = context.Extensions.Get<Destination[]>();
+        var routes = routeTable.Route(incomingInterface, destinations);
         var ops = routes
             .Where(r => r.Gateway != null)
             .SelectMany(r => Subscribe(subscriber, r.Gateway, messageType, intent, dispatcher, r.Destination))

@@ -8,10 +8,11 @@ using NServiceBus.Transport;
 
 class RouterImpl : IRouter
 {
-    public RouterImpl(string name, Interface[] interfaces, IRoutingProtocol routingProtocol)
+    public RouterImpl(string name, Interface[] interfaces, IRoutingProtocol routingProtocol, FindDestinations findDestinations)
     {
         this.name = name;
         this.routingProtocol = routingProtocol;
+        this.findDestinations = findDestinations ?? FindDestinationsByHeaders;
         this.interfaces = interfaces.ToDictionary(x => x.Name, x => x);
     }
 
@@ -31,7 +32,9 @@ class RouterImpl : IRouter
             case MessageIntentEnum.Subscribe:
             case MessageIntentEnum.Unsubscribe:
             case MessageIntentEnum.Send:
-                var outgoingInterfaces = routingProtocol.RouteTable.GetOutgoingInterfaces(incomingIface, msg);
+                var destinations = findDestinations(msg).ToArray();
+                msg.Extensions.Set(destinations);
+                var outgoingInterfaces = routingProtocol.RouteTable.GetOutgoingInterfaces(incomingIface, destinations);
                 var forwardTasks = outgoingInterfaces.Select(i => GetInterface(i).Forward(incomingIface, msg));
                 return Task.WhenAll(forwardTasks.ToArray());
             case MessageIntentEnum.Publish:
@@ -43,17 +46,51 @@ class RouterImpl : IRouter
         }
     }
 
+    static IEnumerable<Destination> FindDestinationsByHeaders(MessageContext context)
+    {
+        context.Headers.TryGetValue("NServiceBus.Bridge.DestinationEndpoint", out var destinationEndpoint);
+        
+        if (!context.Headers.TryGetValue("NServiceBus.Bridge.DestinationSites", out var sites))
+        {
+            if (destinationEndpoint == null)
+            {
+                throw new UnforwardableMessageException("Either 'NServiceBus.Bridge.DestinationEndpoint' or 'NServiceBus.Bridge.DestinationSites' is required to forward a message.");
+            }
+            var dest = new Destination(destinationEndpoint, null);
+            yield return dest;
+            yield break;
+        }
+        var siteArray = sites.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var s in siteArray)
+        {
+            var dest = new Destination(destinationEndpoint, s);
+            yield return dest;
+        }
+    }
+
     void DetectCycles(MessageContext msg)
     {
         if (msg.Headers.TryGetValue("NServiceBus.Bridge.Trace", out var trace))
         {
-            trace.DecodeTLV((t, v) =>
+            var cycleDetected = false;
+            try
             {
-                if (t == "via" && v == name) //We forwarded this message
+                trace.DecodeTLV((t, v) =>
                 {
-                    throw new UnforwardableMessageException("Routing cycle detected: " + trace);
-                }
-            });
+                    if (t == "via" && v == name) //We forwarded this message
+                    {
+                        cycleDetected = true;
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                throw new UnforwardableMessageException($"Cannot decode value in \'NServiceBus.Bridge.Trace\' header: {ex.Message}");
+            }
+            if (cycleDetected)
+            {
+                throw new UnforwardableMessageException($"Routing cycle detected: {trace}");
+            }
         }
     }
 
@@ -90,13 +127,20 @@ class RouterImpl : IRouter
         {
             throw new UnforwardableMessageException($"The reply has to contain a '{Headers.CorrelationId}' header set by the sending endpoint when sending out the initial message.");
         }
-        correlationId.DecodeTLV((t, v) =>
+        try
         {
-            if (t == "iface" || t == "port") //Port for compat reasons
+            correlationId.DecodeTLV((t, v) =>
             {
-                destinationIface = v;
-            }
-        });
+                if (t == "iface" || t == "port") //Port for compat reasons
+                {
+                    destinationIface = v;
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            throw new UnforwardableMessageException($"Cannot decode value in \'{Headers.CorrelationId}\' header: {e.Message}");
+        }
 
         if (destinationIface == null)
         {
@@ -108,5 +152,6 @@ class RouterImpl : IRouter
 
     string name;
     IRoutingProtocol routingProtocol;
+    FindDestinations findDestinations;
     Dictionary<string, Interface> interfaces;
 }

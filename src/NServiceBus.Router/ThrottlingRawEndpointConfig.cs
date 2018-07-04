@@ -5,6 +5,7 @@ using NServiceBus;
 using NServiceBus.Extensibility;
 using NServiceBus.Logging;
 using NServiceBus.Raw;
+using NServiceBus.Router;
 using NServiceBus.Routing;
 using NServiceBus.Settings;
 using NServiceBus.Transport;
@@ -195,6 +196,11 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
 
         public async Task<ErrorHandleResult> OnError(IErrorHandlingPolicyContext handlingContext, IDispatchMessages dispatcher)
         {
+            if (handlingContext.Error.Exception is UnforwardableMessageException)
+            {
+                //UnforwardableMessageException immediately triggers poison queue
+                return await poisonMessageHandling(handlingContext, dispatcher).ConfigureAwait(false);
+            }
             if (handlingContext.Error.ImmediateProcessingFailures < immediateRetries)
             {
                 return ErrorHandleResult.RetryRequired;

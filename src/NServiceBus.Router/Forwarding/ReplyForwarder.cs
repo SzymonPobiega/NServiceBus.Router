@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using NServiceBus;
 using NServiceBus.Router;
@@ -18,17 +19,24 @@ class ReplyForwarder
             throw new UnforwardableMessageException($"The reply has to contain a '{Headers.CorrelationId}' header set by the router connector when sending out the initial message.");
         }
 
-        correlationId.DecodeTLV((t, v) =>
+        try
         {
-            if (t == "reply-to")
+            correlationId.DecodeTLV((t, v) =>
             {
-                replyTo = v;
-            }
-            if (t == "id")
-            {
-                forwardedHeaders[Headers.CorrelationId] = v;
-            }
-        });
+                if (t == "reply-to")
+                {
+                    replyTo = v;
+                }
+                if (t == "id")
+                {
+                    forwardedHeaders[Headers.CorrelationId] = v;
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            throw new UnforwardableMessageException($"Cannot decode value in '{Headers.CorrelationId}' header: " + e.Message);
+        }
 
         if (replyTo == null)
         {

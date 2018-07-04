@@ -4,7 +4,11 @@ class Route
 {
     public Route(string destination, string gateway)
     {
-        Destination = destination ?? throw new ArgumentNullException(nameof(destination));
+        if (destination == null && gateway == null)
+        {
+            throw new ArgumentException("Either destination or gateway has to be specified.");
+        }
+        Destination = destination;
         Gateway = gateway;
     }
 

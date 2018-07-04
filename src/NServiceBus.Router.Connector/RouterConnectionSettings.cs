@@ -14,13 +14,22 @@ namespace NServiceBus
         }
 
         /// <summary>
+        /// Delegates routing of a given message type to the router.
+        /// </summary>
+        /// <param name="messageType">Message type.</param>
+        public void DelegateRouting(Type messageType)
+        {
+            SendRouteTable[messageType] = null;
+        }
+
+        /// <summary>
         /// Instructs the endpoint to route messages of this type to a designated endpoint via the router.
         /// </summary>
         /// <param name="messageType">Message type.</param>
         /// <param name="endpointName">Name of the destination endpoint.</param>
         public void RouteToEndpoint(Type messageType, string endpointName)
         {
-            SendRouteTable[messageType] = endpointName;
+            SendRouteTable[messageType] = endpointName ?? throw new ArgumentNullException(nameof(endpointName));
         }
 
         /// <summary>

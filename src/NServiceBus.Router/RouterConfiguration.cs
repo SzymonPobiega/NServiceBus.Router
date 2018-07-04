@@ -75,7 +75,16 @@ namespace NServiceBus.Router
         {
             InterceptMethod = interceptMethod ?? throw new ArgumentNullException(nameof(interceptMethod));
         }
-        
+
+        /// <summary>
+        /// Overrides default way of finding destinations of messages.
+        /// </summary>
+        /// <param name="findDestinations"></param>
+        public void FindDestinationsUsing(FindDestinations findDestinations)
+        {
+            FindDestinations = findDestinations;
+        }
+
         /// <summary>
         /// Configures the routing protocol.
         /// </summary>
@@ -90,5 +99,6 @@ namespace NServiceBus.Router
         RuntimeTypeGenerator typeGenerator = new RuntimeTypeGenerator();
         internal List<Func<Interface>> PortFactories = new List<Func<Interface>>();
         internal IRoutingProtocol RoutingProtocol;
+        internal FindDestinations FindDestinations;
     }
 }

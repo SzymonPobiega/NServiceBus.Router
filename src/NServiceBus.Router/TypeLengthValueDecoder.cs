@@ -1,5 +1,4 @@
 ﻿using System;
-using NServiceBus.Router;
 
 static class TLV
 {
@@ -21,7 +20,7 @@ static class TLV
             var next = remaining.IndexOf("|", StringComparison.Ordinal);
             if (next < 0)
             {
-                throw new UnforwardableMessageException("Expected type");
+                throw new Exception($"Expected type followed by a delimiter, found '{remaining}'");
             }
             var type = remaining.Substring(0, next);
             remaining = remaining.Substring(next + 1);
@@ -29,15 +28,23 @@ static class TLV
             next = remaining.IndexOf("|", StringComparison.Ordinal);
             if (next < 0)
             {
-                throw new UnforwardableMessageException("Expected length");
+                throw new Exception($"Expected length followed by a delimiter, found '{remaining}'");
             }
             var lengthString = remaining.Substring(0, next);
-            var length = int.Parse(lengthString);
+            int length;
+            try
+            {
+                length = int.Parse(lengthString);
+            }
+            catch (Exception)
+            {
+                throw new Exception($"Expected length to be a valid integer, found '{lengthString}'");
+            }
 
             remaining = remaining.Substring(next + 1);
             if (remaining.Length < length)
             {
-                throw new UnforwardableMessageException($"Expected content of {length} characters");
+                throw new Exception($"Expected content of {length} characters, found '{remaining}'");
             }
 
             var value = remaining.Substring(0, length);
@@ -51,7 +58,7 @@ static class TLV
             }
             if (!remaining.StartsWith("|"))
             {
-                throw new UnforwardableMessageException("Expected separator");
+                throw new Exception($"Expected delimiter, found {remaining}");
             }
             remaining = remaining.Substring(1);
         }

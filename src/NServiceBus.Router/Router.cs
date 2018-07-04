@@ -20,7 +20,7 @@ namespace NServiceBus.Router
             }
 
             var ports = config.PortFactories.Select(x => x()).ToArray();
-            return new RouterImpl(config.Name, ports, config.RoutingProtocol);
+            return new RouterImpl(config.Name, ports, config.RoutingProtocol, config.FindDestinations);
         }
     }
 }

@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using NServiceBus;
 using NServiceBus.Router;
 using NServiceBus.Configuration.AdvancedExtensibility;
+using NServiceBus.Logging;
 using NServiceBus.Raw;
 using NServiceBus.Settings;
 using NServiceBus.Transport;
@@ -44,7 +45,11 @@ class Interface<T> : Interface where T : TransportDefinition, new()
                 }
                 await onMessage(context);
             },
-            (context, dispatcher) => context.MoveToErrorQueue(poisonQueue),
+            (context, dispatcher) =>
+            {
+                log.Error("Moving poison message to the error queue", context.Error.Exception);
+                return context.MoveToErrorQueue(poisonQueue);
+            },
             maximumConcurrency,
             immediateRetries, delayedRetries, circuitBreakerThreshold, autoCreateQueues, autoCreateQueuesIdentity);
     }
@@ -124,6 +129,7 @@ class Interface<T> : Interface where T : TransportDefinition, new()
         }
     }
 
+    static ILog log = LogManager.GetLogger(typeof(Interface));
     string endpointName;
     ForwardingConfiguration forwardingConfiguration;
     InterceptMessageForwarding interceptMethod;
