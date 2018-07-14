@@ -39,16 +39,19 @@ namespace NServiceBus.Router
 
         internal IEnumerable<string> GetOutgoingInterfaces(string incomingInterface, IEnumerable<Destination> destinations)
         {
-            return destinations.Select(d => GetOutgoingInterface(incomingInterface, d));
+            return destinations.Select(d => GetOutgoingInterface(incomingInterface, d)).Distinct();
         }
 
         internal IEnumerable<Route> Route(string incomingInterface, IEnumerable<Destination> destinations)
         {
-            return destinations.Select(d =>
+            foreach (var d in destinations)
             {
                 var nextHop = GetNextHop(incomingInterface, d);
-                return new Route(d.Endpoint, nextHop);
-            });
+                if (nextHop != null || d.Endpoint != null)
+                {
+                    yield return new Route(d.Endpoint, nextHop);
+                }
+            }
         }
 
         internal string GetOutgoingInterface(string incomingInterface, Destination dest)

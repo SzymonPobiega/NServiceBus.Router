@@ -45,13 +45,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                         settings.Set("MainSerializer", serializer);
                     });
                     leftIface.LimitMessageProcessingConcurrencyTo(1); //To ensure when tracer arrives the subscribe request has already been processed.;
-                    cfg.InterceptForwarding((queue, message, dispatch, forward) =>
-                    {
-                        using (new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled))
-                        {
-                            return forward(dispatch);
-                        }
-                    });
+                    cfg.AddRule(_ => new SuppressTransactionScopeRule());
                     cfg.UseStaticRoutingProtocol().AddForwardRoute("Left", "Right");
                 })
                 .WithEndpoint<Publisher>(c => c.When(x => x.EventSubscribed, s => s.Publish(new MyAsbEvent())))
@@ -64,6 +58,17 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 .Run();
 
             Assert.IsTrue(result.EventDelivered);
+        }
+
+        class SuppressTransactionScopeRule : IRule<RawContext, RawContext>
+        {
+            public Task Invoke(RawContext context, Func<RawContext, Task> next)
+            {
+                using (new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled))
+                {
+                    return next(context);
+                }
+            }
         }
 
         static bool EventConvention(Type x)

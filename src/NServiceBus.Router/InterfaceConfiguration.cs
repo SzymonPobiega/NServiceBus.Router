@@ -1,6 +1,7 @@
 ﻿namespace NServiceBus.Router
 {
     using System;
+    using Raw;
     using Routing;
     using Transport;
     using Unicast.Subscriptions.MessageDrivenSubscriptions;
@@ -62,10 +63,10 @@
         /// </summary>
         public EndpointInstances EndpointInstances { get; } = new EndpointInstances();
 
-        internal Interface Create(string endpointName, RuntimeTypeGenerator typeGenerator, string poisonQueue, bool? hubAutoCreateQueues, string hubAutoCreateQueuesIdentity, InterceptMessageForwarding interceptMethod, Func<RouteTable> routeTable, int immediateRetries, int delayedRetries, int circuitBreakerThreshold)
+        internal Interface Create(string endpointName, string poisonQueue, bool? hubAutoCreateQueues, string hubAutoCreateQueuesIdentity, int immediateRetries, int delayedRetries, int circuitBreakerThreshold)
         {
-            var routing = new ForwardingConfiguration(typeGenerator, EndpointInstances, subscriptionStorage, DistributionPolicy);
-            return new Interface<T>(endpointName, Name, customization, routing, routeTable, poisonQueue, maximumConcurrency, interceptMethod, autoCreateQueues ?? hubAutoCreateQueues ?? false, autoCreateQueuesIdentity ?? hubAutoCreateQueuesIdentity, immediateRetries, delayedRetries, circuitBreakerThreshold);
+            IRuleCreationContext ContextFactory(IRawEndpoint e) => new RuleCreationContext(EndpointInstances, subscriptionStorage, DistributionPolicy, e);
+            return new Interface<T>(endpointName, Name, customization, ContextFactory, poisonQueue, maximumConcurrency, autoCreateQueues ?? hubAutoCreateQueues ?? false, autoCreateQueuesIdentity ?? hubAutoCreateQueuesIdentity, immediateRetries, delayedRetries, circuitBreakerThreshold);
         }
     }
 }

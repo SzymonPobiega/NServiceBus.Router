@@ -30,7 +30,7 @@ namespace NServiceBus.Router.AcceptanceTests.Poison
 
             Assert.IsFalse(result.RequestReceived);
             Assert.IsTrue(result.PoisonMessageDetected);
-            Assert.AreEqual("Either \'NServiceBus.Bridge.DestinationEndpoint\' or \'NServiceBus.Bridge.DestinationSites\' is required to forward a message.", result.ExceptionMessage);
+            Assert.AreEqual("No destinations could be found for message.", result.ExceptionMessage);
             Assert.IsTrue(result.Logs.Any(l => l.Message.Contains(result.ExceptionMessage)));
         }
 

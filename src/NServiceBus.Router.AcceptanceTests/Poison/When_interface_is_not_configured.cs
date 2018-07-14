@@ -31,7 +31,7 @@ namespace NServiceBus.Router.AcceptanceTests.Poison
 
             Assert.IsFalse(result.RequestReceived);
             Assert.IsTrue(result.PoisonMessageDetected);
-            Assert.AreEqual("Interface \'NotConfigured\' is not configured", result.ExceptionMessage);
+            Assert.AreEqual("Interface \'NotConfigured\' has not been configured.", result.ExceptionMessage);
             Assert.IsTrue(result.Logs.Any(l => l.Message.Contains(result.ExceptionMessage)));
         }
 

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 
-class RuntimeTypeGenerator
+public class RuntimeTypeGenerator
 {
     public Type GetType(string messageType)
     {
@@ -29,6 +29,7 @@ class RuntimeTypeGenerator
                 assemblies[assembly] = moduleBuilder;
             }
         }
+
         Type result;
         lock (types)
         {
@@ -43,10 +44,12 @@ class RuntimeTypeGenerator
                     var path = string.Join("+", nestedParts.Take(i + 1));
                     typeBuilder = GetNestedTypeBuilder(typeBuilder, nestedParts[i], path);
                 }
+
                 result = typeBuilder.CreateTypeInfo();
                 types[messageType] = result;
             }
         }
+
         return result;
     }
 

@@ -6,19 +6,15 @@ using NUnit.Framework;
 
 namespace NServiceBus.Router.AcceptanceTests.SingleRouter
 {
+    using System;
     using System.IO;
-    using System.Linq;
     using System.Text;
     using AcceptanceTesting.Customization;
     using global::Newtonsoft.Json;
-    using Routing;
-    using Transport;
 
     [TestFixture]
     public class When_mutating_messages : NServiceBusAcceptanceTest
     {
-        static JsonSerializer jsonSerializer = new JsonSerializer();
-
         [Test]
         public async Task Receiver_should_see_modified_body()
         {
@@ -29,24 +25,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                     cfg.AddInterface<TestTransport>("Right", t => t.BrokerBravo()).InMemorySubscriptions();
 
                     cfg.UseStaticRoutingProtocol().AddForwardRoute("Left", "Right");
-                    cfg.InterceptForwarding((queue, message, dispatch, forwardMethod) => forwardMethod((ops, transaction, context) =>
-                    {
-                        var op = ops.UnicastTransportOperations.Single();
-                        if (!op.Message.Headers.ContainsKey(Headers.EnclosedMessageTypes))
-                        {
-                            return dispatch(ops, transaction, context);
-                        }
-
-                        var deserialized = DeserializeMessage(op.Message.Body, jsonSerializer);
-                        deserialized.Number += 2;
-                        var serialized = SerializeMessage(deserialized, jsonSerializer);
-
-                        var newMessage = new OutgoingMessage(op.Message.MessageId, op.Message.Headers, serialized);
-                        var newOp = new TransportOperation(newMessage, new UnicastAddressTag(op.Destination), op.RequiredDispatchConsistency, op.DeliveryConstraints);
-                        var newOps = new TransportOperations(newOp);
-
-                        return dispatch(newOps, transaction, context);
-                    }));
+                    cfg.AddRule(_ => new MessageMutator());
                 })
                 .WithEndpoint<Sender>(c => c.When(s => s.Send(new MyMessage
                 {
@@ -59,36 +38,47 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             Assert.AreEqual(44, result.ValueReceived);
         }
 
-        static MyMessage DeserializeMessage(byte[] body, JsonSerializer serializer)
+        class MessageMutator : IRule<PreroutingContext, PreroutingContext>
         {
-            MyMessage deserialized;
-            using (var stream = new MemoryStream(body))
+            static JsonSerializer jsonSerializer = new JsonSerializer();
+
+            public Task Invoke(PreroutingContext context, Func<PreroutingContext, Task> next)
             {
-                using (var streamReader = new StreamReader(stream, Encoding.UTF8))
-                {
-                    using (var jsonReader = new JsonTextReader(streamReader))
-                    {
-                        deserialized = serializer.Deserialize<MyMessage>(jsonReader);
-                    }
-                }
+                var message = DeserializeMessage(context.Body, jsonSerializer);
+                message.Number += 2;
+                context.Body = SerializeMessage(message, jsonSerializer);
+                return next(context);
             }
 
-            return deserialized;
-        }
-
-        static byte[] SerializeMessage(MyMessage message, JsonSerializer serializer)
-        {
-            using (var stream = new MemoryStream())
+            static MyMessage DeserializeMessage(byte[] body, JsonSerializer serializer)
             {
-                using (var streamWriter = new StreamWriter(stream, Encoding.UTF8))
+                MyMessage deserialized;
+                using (var stream = new MemoryStream(body))
                 {
-                    using (var jsonWriter = new JsonTextWriter(streamWriter))
+                    using (var streamReader = new StreamReader(stream, Encoding.UTF8))
                     {
-                        serializer.Serialize(jsonWriter, message);
+                        using (var jsonReader = new JsonTextReader(streamReader))
+                        {
+                            deserialized = serializer.Deserialize<MyMessage>(jsonReader);
+                        }
                     }
                 }
+                return deserialized;
+            }
 
-                return stream.ToArray();
+            static byte[] SerializeMessage(MyMessage message, JsonSerializer serializer)
+            {
+                using (var stream = new MemoryStream())
+                {
+                    using (var streamWriter = new StreamWriter(stream, Encoding.UTF8))
+                    {
+                        using (var jsonWriter = new JsonTextWriter(streamWriter))
+                        {
+                            serializer.Serialize(jsonWriter, message);
+                        }
+                    }
+                    return stream.ToArray();
+                }
             }
         }
 
