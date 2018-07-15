@@ -31,6 +31,9 @@
         IRawEndpoint Endpoint { get; }
     }
 
+    /// <summary>
+    /// Provides convenience methods for <seealso cref="IRuleCreationContext"/>.
+    /// </summary>
     public static class RuleCreationContextExtensions
     {
         /// <summary>

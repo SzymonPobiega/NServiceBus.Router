@@ -4,7 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 
-public class RuntimeTypeGenerator
+class RuntimeTypeGenerator
 {
     public Type GetType(string messageType)
     {

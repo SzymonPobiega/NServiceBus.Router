@@ -5,11 +5,18 @@
     /// </summary>
     public class PublishPreroutingContext : BasePreroutingContext
     {
-        internal PublishPreroutingContext(string[] types, PreroutingContext parent) : base(parent)
+        /// <summary>
+        /// Creates new instance.
+        /// </summary>
+        public PublishPreroutingContext(string[] types, PreroutingContext parent) : base(parent)
         {
             Types = types;
             Body = parent.Body;
         }
+
+        /// <summary>
+        /// Event types associated with the message being forwarded.
+        /// </summary>
         public string[] Types { get; }
 
         /// <summary>

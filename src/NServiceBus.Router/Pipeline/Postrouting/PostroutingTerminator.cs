@@ -1,44 +1,42 @@
-﻿namespace NServiceBus.Router
+﻿using System.Threading.Tasks;
+using NServiceBus.Raw;
+using NServiceBus.Router;
+using NServiceBus.Transport;
+
+class PostroutingTerminator : ChainTerminator<PostroutingContext>
 {
-    using System.Threading.Tasks;
-    using Raw;
-    using Transport;
+    IRawEndpoint dispatcher;
+    string endpointName;
 
-    class PostroutingTerminator : ChainTerminator<PostroutingContext>
+    public PostroutingTerminator(IRawEndpoint dispatcher)
     {
-        IRawEndpoint dispatcher;
-        string endpointName;
+        this.dispatcher = dispatcher;
+        this.endpointName = dispatcher.EndpointName;
+    }
 
-        public PostroutingTerminator(IRawEndpoint dispatcher)
+    protected override Task Terminate(PostroutingContext context)
+    {
+        foreach (var operation in context.Messages.UnicastTransportOperations)
         {
-            this.dispatcher = dispatcher;
-            this.endpointName = dispatcher.EndpointName;
+            AddTrace(operation);
         }
+        foreach (var operation in context.Messages.MulticastTransportOperations)
+        {
+            AddTrace(operation);
+        }
+        return dispatcher.Dispatch(context.Messages, context.Get<TransportTransaction>(), context);
+    }
 
-        protected override Task Terminate(PostroutingContext context)
+    void AddTrace(IOutgoingTransportOperation op)
+    {
+        if (op.Message.Headers.TryGetValue("NServiceBus.Bridge.Trace", out var trace))
         {
-            foreach (var operation in context.Messages.UnicastTransportOperations)
-            {
-                AddTrace(operation);
-            }
-            foreach (var operation in context.Messages.MulticastTransportOperations)
-            {
-                AddTrace(operation);
-            }
-            return dispatcher.Dispatch(context.Messages, context.Get<TransportTransaction>(), context);
+            trace = trace.AppendTLV("via", endpointName);
         }
-
-        void AddTrace(IOutgoingTransportOperation op)
+        else
         {
-            if (op.Message.Headers.TryGetValue("NServiceBus.Bridge.Trace", out var trace))
-            {
-                trace = trace.AppendTLV("via", endpointName);
-            }
-            else
-            {
-                trace = TLV.Encode("via", endpointName);
-            }
-            op.Message.Headers["NServiceBus.Bridge.Trace"] = trace;
+            trace = TLV.Encode("via", endpointName);
         }
+        op.Message.Headers["NServiceBus.Bridge.Trace"] = trace;
     }
 }

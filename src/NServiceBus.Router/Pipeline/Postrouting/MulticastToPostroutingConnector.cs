@@ -1,31 +1,29 @@
-﻿namespace NServiceBus.Router
+﻿using System;
+using System.Linq;
+using System.Threading.Tasks;
+using NServiceBus.Router;
+using NServiceBus.Routing;
+using NServiceBus.Transport;
+
+class MulticastToPostroutingConnector : IRule<MulticastContext, PostroutingContext>
 {
-    using System;
-    using System.Linq;
-    using System.Threading.Tasks;
-    using Routing;
-    using Transport;
+    EndpointInstances endpointInstances;
+    Func<EndpointInstance, string> resolveTransportAddress;
 
-    class MulticastToPostroutingConnector : IRule<MulticastContext, PostroutingContext>
+    public MulticastToPostroutingConnector(EndpointInstances endpointInstances, Func<EndpointInstance, string> resolveTransportAddress)
     {
-        EndpointInstances endpointInstances;
-        Func<EndpointInstance, string> resolveTransportAddress;
+        this.endpointInstances = endpointInstances;
+        this.resolveTransportAddress = resolveTransportAddress;
+    }
 
-        public MulticastToPostroutingConnector(EndpointInstances endpointInstances, Func<EndpointInstance, string> resolveTransportAddress)
-        {
-            this.endpointInstances = endpointInstances;
-            this.resolveTransportAddress = resolveTransportAddress;
-        }
+    public Task Invoke(MulticastContext context, Func<PostroutingContext, Task> next)
+    {
+        var addresses = endpointInstances.FindInstances(context.DestinationEndpoint)
+            .Select(resolveTransportAddress)
+            .ToArray();
 
-        public Task Invoke(MulticastContext context, Func<PostroutingContext, Task> next)
-        {
-            var addresses = endpointInstances.FindInstances(context.DestinationEndpoint)
-                .Select(resolveTransportAddress)
-                .ToArray();
+        var operations = addresses.Select(a => new TransportOperation(context.Message, new UnicastAddressTag(a)));
 
-            var operations = addresses.Select(a => new TransportOperation(context.Message, new UnicastAddressTag(a)));
-
-            return next(new PostroutingContext(new TransportOperations(operations.ToArray()), context));
-        }
+        return next(new PostroutingContext(new TransportOperations(operations.ToArray()), context));
     }
 }
