@@ -74,7 +74,7 @@ namespace NServiceBus.Router
             var matchingEntry = entries.FirstOrDefault(e => e.DestinationFilter(incomingInterface, dest));
             if (matchingEntry != null)
             {
-                logger.Debug($"Using route {matchingEntry} to find next hop for message to {dest} coming via {incomingInterface}: {matchingEntry.Gateway}.");
+                logger.Debug($"Using route {matchingEntry} to find next hop for message to {dest} coming via {incomingInterface}: {matchingEntry.Gateway ?? "none"}.");
             }
             else if (defaultGateway != null)
             {
