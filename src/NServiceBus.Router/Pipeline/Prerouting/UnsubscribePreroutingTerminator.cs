@@ -10,6 +10,11 @@ class UnsubscribePreroutingTerminator : ChainTerminator<UnsubscribePreroutingCon
     }
     protected override Task Terminate(UnsubscribePreroutingContext context)
     {
+        if (!context.Destinations.Any())
+        {
+            throw new UnforwardableMessageException("No destinations could be found for message.");
+        }
+
         var outgoingInterfaces = routingProtocol.RouteTable.GetOutgoingInterfaces(context.IncomingInterface, context.Destinations);
         var routes = routingProtocol.RouteTable.Route(context.IncomingInterface, context.Destinations);
 

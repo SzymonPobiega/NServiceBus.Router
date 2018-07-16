@@ -27,8 +27,7 @@ class ForwardPublishStorageDrivenRule : IRule<ForwardPublishContext, ForwardPubl
         var subscribers = await subscriptionStorage.GetSubscriberAddressesForMessage(typeObjects, new ContextBag()).ConfigureAwait(false);
 
         var destinations = SelectDestinationsForEachEndpoint(subscribers);
-        var outgoingMessage = new OutgoingMessage(context.MessageId, context.ReceivedHeaders.Copy(), context.ReceivedBody);
-        var operations = destinations.Select(x => new TransportOperation(outgoingMessage, new UnicastAddressTag(x)));
+        var operations = destinations.Select(x => new TransportOperation(new OutgoingMessage(context.MessageId, context.ReceivedHeaders.Copy(), context.ReceivedBody), new UnicastAddressTag(x)));
 
         var forkContext = new PostroutingContext(new TransportOperations(operations.ToArray()), context);
         var chain = context.Chains.Get<PostroutingContext>();

@@ -10,7 +10,7 @@ class SendPreroutingTerminator : ChainTerminator<SendPreroutingContext>
     }
     protected override Task Terminate(SendPreroutingContext context)
     {
-        if (context.Destinations.Count == 0)
+        if (!context.Destinations.Any())
         {
             throw new UnforwardableMessageException("No destinations could be found for message.");
         }
