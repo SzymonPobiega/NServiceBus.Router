@@ -1,5 +1,6 @@
 namespace NServiceBus.Router
 {
+    
     using System;
     using System.Collections.Generic;
     using Transport;
@@ -87,9 +88,18 @@ namespace NServiceBus.Router
             Chains.AddRule(constructor, condition);
         }
 
+        /// <summary>
+        /// Adds a module.
+        /// </summary>
+        public void AddModule(IModule module)
+        {
+            Modules.Add(module);
+        }
+
         bool? autoCreateQueues;
         string autoCreateQueuesIdentity;
         internal List<Func<Interface>> InterfaceFactories = new List<Func<Interface>>();
+        internal List<IModule> Modules = new List<IModule>();
         internal IRoutingProtocol RoutingProtocol;
         internal InterfaceChains Chains = new InterfaceChains();
     }

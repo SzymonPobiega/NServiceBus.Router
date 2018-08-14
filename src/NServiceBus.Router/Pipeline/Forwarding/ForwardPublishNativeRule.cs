@@ -20,7 +20,7 @@ class ForwardPublishNativeRule : IRule<ForwardPublishContext, ForwardPublishCont
         var outgoingMessage = new OutgoingMessage(context.MessageId, context.ReceivedHeaders.Copy(), context.ReceivedBody);
         var operation = new TransportOperation(outgoingMessage, addressTag);
 
-        var forkContext = new PostroutingContext(new TransportOperations(operation), context);
+        var forkContext = new PostroutingContext(operation, context);
         var chain = context.Chains.Get<PostroutingContext>();
         await chain.Invoke(forkContext).ConfigureAwait(false);
         await next(context).ConfigureAwait(false);

@@ -68,7 +68,7 @@ namespace NServiceBus.Router
             chains.AddRule(_ => new ForwardPublishTerminator());
             chains.AddRule(_ => new ForwardReplyTerminator());
 
-            return new RouterImpl(config.Name, interfaces, config.RoutingProtocol, chains);
+            return new RouterImpl(config.Name, interfaces, config.Modules.ToArray(), config.RoutingProtocol, chains);
         }
     }
 }

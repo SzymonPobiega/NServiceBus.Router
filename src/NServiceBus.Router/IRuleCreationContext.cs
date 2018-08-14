@@ -11,6 +11,10 @@
     public interface IRuleCreationContext
     {
         /// <summary>
+        /// Name of the interface.
+        /// </summary>
+        string InetrfaceName { get; }
+        /// <summary>
         /// The endpoint instance collection for a given interface.
         /// </summary>
         EndpointInstances EndpointInstances { get; }

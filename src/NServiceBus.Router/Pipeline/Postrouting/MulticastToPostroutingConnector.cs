@@ -24,6 +24,6 @@ class MulticastToPostroutingConnector : IRule<MulticastContext, PostroutingConte
 
         var operations = addresses.Select(a => new TransportOperation(context.Message, new UnicastAddressTag(a)));
 
-        return next(new PostroutingContext(new TransportOperations(operations.ToArray()), context));
+        return next(new PostroutingContext(operations.ToArray(), context));
     }
 }

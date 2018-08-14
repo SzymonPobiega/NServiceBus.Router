@@ -1,5 +1,6 @@
 ﻿namespace NServiceBus.Router
 {
+    using System;
     using Extensibility;
 
     /// <summary>
@@ -11,9 +12,9 @@
         /// Creates new instance.
         /// </summary>
         protected RuleContext(RuleContext parentContext, string @interface = null) 
-            : base(parentContext?.Extensions)
+            : base(parentContext.Extensions)
         {
-            Interface = @interface ?? parentContext.Interface;
+            Interface = @interface ?? parentContext.Interface ?? throw new Exception("Interface is required.");
         }
 
         internal RuleContext(RootContext parentContext, string @interface)

@@ -28,6 +28,6 @@ class AnycastToPostroutingConnector : IRule<AnycastContext, PostroutingContext>
 
         var operation = new TransportOperation(context.Message, new UnicastAddressTag(selected));
 
-        return next(new PostroutingContext(new TransportOperations(operation), context));
+        return next(new PostroutingContext(operation, context));
     }
 }

@@ -44,7 +44,7 @@ class ForwardReplyRule : IRule<ForwardReplyContext, ForwardReplyContext>
         var operation = new TransportOperation(outgoingMessage, new UnicastAddressTag(replyTo));
 
         var chain = context.Chains.Get<PostroutingContext>();
-        var forkContext = new PostroutingContext(new TransportOperations(operation), context);
+        var forkContext = new PostroutingContext(operation, context);
         await chain.Invoke(forkContext).ConfigureAwait(false);
         await next(context).ConfigureAwait(false);
     }
