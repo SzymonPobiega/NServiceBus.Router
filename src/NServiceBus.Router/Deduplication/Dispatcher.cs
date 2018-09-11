@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Data.SqlClient;
 using System.Threading;
 using System.Threading.Tasks;
+using NServiceBus;
 using NServiceBus.Logging;
 using NServiceBus.Router;
 using NServiceBus.Router.Deduplication;
@@ -34,22 +35,31 @@ class Dispatcher : IModule
     public Task Start(RootContext rootContext)
     {
         tokenSource = new CancellationTokenSource();
+        var throttle = new SemaphoreSlim(8);
         loopTask = Task.Run(async () =>
         {
             var consumer = operationsQueue.GetConsumingEnumerable(tokenSource.Token);
 
             foreach (var operation in consumer)
             {
-                try
+                await throttle.WaitAsync().ConfigureAwait(false);
+                var dispatchTask = Task.Run(async () =>
                 {
-                    await Dispatch(operation, rootContext).ConfigureAwait(false);
-                }
-                catch (Exception e)
-                {
-                    //We can skip over messages because closing process will make sure all the messages are dispatched
-                    //TODO: We might want some retries here.
-                    logger.Error("Unhandled exception in the dispatcher", e);
-                }
+                    try
+                    {
+                        await Dispatch(operation, rootContext).ConfigureAwait(false);
+                    }
+                    catch (Exception e)
+                    {
+                            //We can skip over messages because closing process will make sure all the messages are dispatched
+                            //TODO: We might want some retries here.
+                            logger.Error("Unhandled exception in the dispatcher", e);
+                    }
+                    finally
+                    {
+                        throttle.Release();
+                    }
+                });
             }
         });
         return Task.CompletedTask;
@@ -82,13 +92,15 @@ class Dispatcher : IModule
                 //Will block until the record insert transaction is completed.
                 await persistence.MarkDispatched(operation, conn, trans).ConfigureAwait(false);
 
-                var iface = settings.GetInterface(operation.Destination);
+                var iface = settings.GetDestinationInterface(operation.Destination);
 
                 var chains = rootContext.Interfaces.GetChainsFor(iface);
-                var postroutingChain = chains.Get<PostroutingContext>();
-                var dispatchContext = new PostroutingContext(operation.Operation, iface, rootContext);
+                var chain = chains.Get<AnycastContext>();
+
+                var dispatchContext = new OutboxDispatchContext(rootContext, iface);
+                var forwardContext = new AnycastContext(operation.Destination, operation.OutgoingMessage, DistributionStrategyScope.Send, dispatchContext);
                 dispatchContext.Set(new TransportTransaction());
-                await postroutingChain.Invoke(dispatchContext).ConfigureAwait(false);
+                await chain.Invoke(forwardContext).ConfigureAwait(false);
 
                 //Only commit the transaction if the dispatch succeeded.
                 trans.Commit();

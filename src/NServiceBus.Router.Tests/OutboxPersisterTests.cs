@@ -4,7 +4,6 @@ using System.Data.SqlClient;
 using System.Threading.Tasks;
 using NServiceBus.Logging;
 using NServiceBus.Router.Deduplication;
-using NServiceBus.Routing;
 using NServiceBus.Transport;
 using NUnit.Framework;
 
@@ -18,7 +17,7 @@ public class OutboxPersisterTests
     {
         LogManager.Use<DefaultFactory>().Level(LogLevel.Debug);
 
-        persistence = new OutboxPersistence(3);
+        persistence = new OutboxPersistence(3, "source");
         using (var conn = CreateConnection())
         {
             await conn.OpenAsync().ConfigureAwait(false);
@@ -64,7 +63,7 @@ public class OutboxPersisterTests
         var outgoingMessage = new OutgoingMessage(messageId, new Dictionary<string, string>(), new byte[3]);
         var messages = new List<CapturedTransportOperation>()
         {
-            new CapturedTransportOperation(new TransportOperation(outgoingMessage, new UnicastAddressTag("A")), "A")
+            new CapturedTransportOperation(outgoingMessage, "A")
         };
         return messages;
     }
@@ -78,7 +77,7 @@ public class OutboxPersisterTests
             await conn.OpenAsync().ConfigureAwait(false);
             var (lo, hi) = await persistence.TryClose("A", 0, 6, operation =>
             {
-                Console.WriteLine(operation.Message.MessageId);
+                Console.WriteLine(operation.MessageId);
                 return Task.CompletedTask;
             }, conn);
 
@@ -103,7 +102,7 @@ public class OutboxPersisterTests
 
             var (lo, hi) = await persistence.TryClose("A", 0, 6, operation =>
             {
-                Console.WriteLine(operation.Message.MessageId);
+                Console.WriteLine(operation.MessageId);
                 return Task.CompletedTask;
             }, conn);
 
@@ -151,7 +150,7 @@ public class OutboxPersisterTests
 
             var (lo, hi) = await persistence.TryClose("A", 0, 6, operation =>
             {
-                Console.WriteLine(operation.Message.MessageId);
+                Console.WriteLine(operation.MessageId);
                 return Task.CompletedTask;
             }, conn);
 

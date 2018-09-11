@@ -7,13 +7,15 @@ using NServiceBus.Router.Deduplication;
 class Installer : IModule
 {
     SqlDeduplicationSettings settings;
-    OutboxPersistence persistence;
+    OutboxPersistence outboxPersistence;
+    InboxPersitence inboxPersitence;
     Func<SqlConnection> connectionFactory;
 
-    public Installer(SqlDeduplicationSettings settings, OutboxPersistence persistence, Func<SqlConnection> connectionFactory)
+    public Installer(SqlDeduplicationSettings settings, OutboxPersistence outboxPersistence, InboxPersitence inboxPersitence, Func<SqlConnection> connectionFactory)
     {
         this.settings = settings;
-        this.persistence = persistence;
+        this.outboxPersistence = outboxPersistence;
+        this.inboxPersitence = inboxPersitence;
         this.connectionFactory = connectionFactory;
     }
 
@@ -27,7 +29,11 @@ class Installer : IModule
             {
                 foreach (var destination in settings.GetAllDestinations())
                 {
-                    await persistence.Install(destination, conn, trans).ConfigureAwait(false);
+                    await outboxPersistence.Install(destination, conn, trans).ConfigureAwait(false);
+                }
+                foreach (var source in settings.GetAllSources())
+                {
+                    await inboxPersitence.Install(source, conn, trans).ConfigureAwait(false);
                 }
                 trans.Commit();
             }

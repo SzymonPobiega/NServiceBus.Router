@@ -20,7 +20,11 @@ class RouterImpl : IRouter
         var rootContext = new RootContext(interfaceChains);
 
         await routingProtocol.Start(new RouterMetadata(name, interfaces.Keys.ToList())).ConfigureAwait(false);
-        await Task.WhenAll(interfaces.Values.Select(p => p.Initialize(interfaceChains, rootContext))).ConfigureAwait(false);
+
+        foreach (var iface in interfaces.Values)
+        {
+            await iface.Initialize(interfaceChains, rootContext).ConfigureAwait(false);
+        }
 
         //Start modules in order
         foreach (var module in modules)

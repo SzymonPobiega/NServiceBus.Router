@@ -3,8 +3,9 @@ using System.Data.SqlClient;
 using System.Threading;
 using System.Threading.Tasks;
 using NServiceBus.Logging;
+using NServiceBus.Transport;
 
-class SequenceEpochManager
+class OutboxCleaner
 {
     string sequenceKey;
     long lastInserted;
@@ -13,17 +14,17 @@ class SequenceEpochManager
     Task closeTask;
     OutboxPersistence persistence;
     Func<SqlConnection> connectionFactory;
-    ILog logger = LogManager.GetLogger<SequenceEpochManager>();
+    ILog logger = LogManager.GetLogger<OutboxCleaner>();
     AsyncManualResetEvent @event = new AsyncManualResetEvent();
 
-    public SequenceEpochManager(string sequenceKey, OutboxPersistence persistence, Func<SqlConnection> connectionFactory)
+    public OutboxCleaner(string sequenceKey, OutboxPersistence persistence, Func<SqlConnection> connectionFactory)
     {
         this.sequenceKey = sequenceKey;
         this.persistence = persistence;
         this.connectionFactory = connectionFactory;
     }
 
-    public void Start(CancellationToken token)
+    public void Start(CancellationToken token, Func<OutgoingMessage, Task> dispatch)
     {
         closeTask = Task.Run(async () =>
         {
@@ -42,7 +43,7 @@ class SequenceEpochManager
 
                         logger.Debug($"Attempting to close epoch for sequence {sequenceKey} based on lo={lo} and hi={hi}");
 
-                        var (newLo, newHi) = await persistence.TryClose(sequenceKey, lo, hi, null, conn);
+                        var (newLo, newHi) = await persistence.TryClose(sequenceKey, lo, hi, dispatch, conn);
 
                         logger.Debug($"New values lo={lo} and hi={hi}");
 
@@ -62,6 +63,10 @@ class SequenceEpochManager
     public async Task Stop()
     {
         @event.Set();
+        if (closeTask == null)
+        {
+            return;
+        }
         try
         {
             await closeTask.ConfigureAwait(false);
@@ -79,6 +84,7 @@ class SequenceEpochManager
         var localLo = Interlocked.Read(ref lo);
 
         var epochSize = localHi - localLo;
+
         if (updated < localLo + epochSize / 2 + epochSize / 4) //We have not got to the upper half of the upper epoch
         {
             return;

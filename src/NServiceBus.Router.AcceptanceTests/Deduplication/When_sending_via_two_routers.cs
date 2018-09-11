@@ -20,6 +20,7 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
         [Test]
         public async Task Should_deliver_the_reply_back()
         {
+            var epochSize = 10;
             var result = await Scenario.Define<Context>()
                 .WithRouter("Green-Blue", cfg =>
                 {
@@ -27,7 +28,7 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
                     {
                         c.ConnectionFactory(() => new SqlConnection(ConnectionString));
                         c.EnsureTotalOrderOfOutgoingMessages("Blue", "Red-Blue");
-                        c.EpochSize(10);
+                        c.EpochSize(epochSize);
                     });
 
                     cfg.AddInterface<SqlServerTransport>("Green", t =>
@@ -43,17 +44,31 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
                 })
                 .WithRouter("Red-Blue", cfg =>
                 {
+                    cfg.EnableSqlDeduplication(c =>
+                    {
+                        c.ConnectionFactory(() => new SqlConnection(ConnectionString));
+                        c.DecuplicateIncomingMessagesBasedOnTotalOrder("Blue", "Green-Blue");
+                        c.EpochSize(epochSize);
+                    });
+
                     cfg.AddInterface<TestTransport>("Blue", t => t.BrokerBravo()).InMemorySubscriptions();
-                    cfg.AddInterface<TestTransport>("Red", t => t.BrokerCharlie()).InMemorySubscriptions();
+                    cfg.AddInterface<SqlServerTransport>("Red", t =>
+                    {
+                        t.ConnectionString(ConnectionString);
+                        t.Transactions(TransportTransactionMode.SendsAtomicWithReceive);
+                    }).InMemorySubscriptions();
 
                     var routeTable = cfg.UseStaticRoutingProtocol();
                     routeTable.AddForwardRoute("Blue", "Red");
                     routeTable.AddForwardRoute("Red", "Blue", "Green-Blue");
                 })
-                .WithEndpoint<GreenEndpoint>(c => c.When(s => s.Send(new GreenRequest())))
+                .WithEndpoint<GreenEndpoint>(c => c.When(s => s.Send(new GreenRequest
+                {
+                    Counter = 0
+                })))
                 .WithEndpoint<RedEndpoint>()
-                .Done(c => c.Counter > 50)
-                .Run(TimeSpan.FromSeconds(60));
+                .Done(c => c.Counter > 200)
+                .Run(TimeSpan.FromSeconds(30));
         }
 
         class Context : ScenarioContext
@@ -85,8 +100,11 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
 
                 public Task Handle(GreenResponse response, IMessageHandlerContext context)
                 {
-                    Interlocked.Increment(ref scenarioContext.Counter);
-                    return context.Send(new GreenRequest());
+                    var incremented = Interlocked.Increment(ref scenarioContext.Counter);
+                    return context.Send(new GreenRequest
+                    {
+                        Counter = incremented
+                    });
                 }
             }
         }
@@ -97,32 +115,41 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    c.UseTransport<TestTransport>().BrokerCharlie();
+                    var transport = c.UseTransport<SqlServerTransport>();
+                    transport.ConnectionString(ConnectionString);
                 });
             }
 
             class GreenRequestHandler : IHandleMessages<GreenRequest>
             {
-                Context scenarioContext;
-
-                public GreenRequestHandler(Context scenarioContext)
-                {
-                    this.scenarioContext = scenarioContext;
-                }
-
                 public Task Handle(GreenRequest request, IMessageHandlerContext context)
                 {
-                    return context.Reply(new GreenResponse());
+                    return context.Reply(new GreenResponse
+                    {
+                        Counter = request.Counter
+                    });
                 }
             }
         }
 
         class GreenRequest : IMessage
         {
+            public int Counter { get; set; }
+
+            public override string ToString()
+            {
+                return Counter.ToString();
+            }
         }
 
         class GreenResponse : IMessage
         {
+            public int Counter { get; set; }
+
+            public override string ToString()
+            {
+                return Counter.ToString();
+            }
         }
     }
 }

@@ -54,6 +54,7 @@ namespace NServiceBus.Router
             chains.AddRule(c => new StorageDrivenSubscriptionRule(c.SubscriptionPersistence), c => !c.HasNativePubSub());
 
             chains.AddRule(c => new ForwardSendRule(c.Endpoint.TransportAddress));
+            chains.AddRule(c => new ForwardSendGatewayRule(c.Endpoint.EndpointName));
             chains.AddRule(_ => new ForwardReplyRule());
             chains.AddRule(c => new ForwardSubscribeGatewayRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName));
             chains.AddRule(c => new ForwardUnsubscribeGatewayRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName));

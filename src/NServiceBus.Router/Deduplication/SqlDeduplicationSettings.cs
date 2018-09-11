@@ -13,13 +13,14 @@
         internal Func<SqlConnection> ConnFactory;
         internal int EpochSizeValue;
         Dictionary<string, string> outboxInterfaceToDestinationMap = new Dictionary<string, string>();
+        Dictionary<string, string> inboxInterfaceToSourceMap = new Dictionary<string, string>();
 
         /// <summary>
-        /// Configures destination for which the total order sequence should be generated.
+        /// Configures destination router for which the total order sequence should be generated.
         /// </summary>
-        public void EnsureTotalOrderOfOutgoingMessages(string outgoingInterface, string destinationAddress)
+        public void EnsureTotalOrderOfOutgoingMessages(string outgoingInterface, string destinationRouter)
         {
-            outboxInterfaceToDestinationMap[destinationAddress] = outgoingInterface;
+            outboxInterfaceToDestinationMap[destinationRouter] = outgoingInterface;
         }
 
         /// <summary>
@@ -30,10 +31,13 @@
             EpochSizeValue = epochSize;
         }
 
-        //public void DecuplicateIncomingMessagesBasedOnTotalOrder(string incomingInterface, string originLogicalName)
-        //{
-
-        //}
+        /// <summary>
+        /// Configures the source router which ensures total order of messages to allow deduplication.
+        /// </summary>
+        public void DecuplicateIncomingMessagesBasedOnTotalOrder(string incomingInterface, string originRouter)
+        {
+            inboxInterfaceToSourceMap[originRouter] = incomingInterface;
+        }
 
         /// <summary>
         /// Sets the connection factory.
@@ -54,7 +58,7 @@
                    && iface == outgoingInterface;
         }
 
-        internal string GetInterface(string destinationAddress)
+        internal string GetDestinationInterface(string destinationAddress)
         {
             return outboxInterfaceToDestinationMap[destinationAddress];
         }
@@ -62,6 +66,27 @@
         internal IEnumerable<string> GetAllDestinations()
         {
             return outboxInterfaceToDestinationMap.Keys;
+        }
+
+        internal IEnumerable<string> GetAllSources()
+        {
+            return inboxInterfaceToSourceMap.Keys;
+        }
+
+        internal IEnumerable<string> GetAllInboxInterfaces()
+        {
+            return inboxInterfaceToSourceMap.Values;
+        }
+
+        internal bool IsInboxEnabledFor(string incomingInterface)
+        {
+            return inboxInterfaceToSourceMap.Values.Contains(incomingInterface);
+        }
+
+        internal bool IsInboxEnabledFor(string incomingInterface, string sourceEndpoint)
+        {
+            return inboxInterfaceToSourceMap.TryGetValue(sourceEndpoint, out var iface)
+                   && iface == incomingInterface;
         }
     }
 }

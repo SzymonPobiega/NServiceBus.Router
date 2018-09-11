@@ -50,7 +50,7 @@ class Interface<T> : Interface where T : TransportDefinition, new()
         this.rootContext = rootContext;
         sender = await rawConfig.Create().ConfigureAwait(false);
         var ruleCreationContext = ruleCreationContextFactory(sender);
-        preroutingChain = interfaces.RegisterInterface(ruleCreationContext, Name);
+        preroutingChain = interfaces.RegisterInterface(ruleCreationContext, Name, sender);
     }
 
     public async Task StartReceiving()

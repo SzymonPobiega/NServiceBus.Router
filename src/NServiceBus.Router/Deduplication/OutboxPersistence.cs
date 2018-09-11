@@ -4,11 +4,7 @@ using System.Data.SqlClient;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using NServiceBus;
-using NServiceBus.DelayedDelivery;
-using NServiceBus.DeliveryConstraints;
 using NServiceBus.Logging;
-using NServiceBus.Performance.TimeToBeReceived;
 using NServiceBus.Router.Deduplication;
 using NServiceBus.Routing;
 using NServiceBus.Transport;
@@ -17,17 +13,19 @@ using TransportOperation = NServiceBus.Transport.TransportOperation;
 class OutboxPersistence
 {
     int epochSize;
+    string sourceSequenceKey;
     static ILog log = LogManager.GetLogger<OutboxPersistence>();
 
-    public OutboxPersistence(int epochSize)
+    public OutboxPersistence(int epochSize, string sourceSequenceKey)
     {
         this.epochSize = epochSize;
+        this.sourceSequenceKey = sourceSequenceKey;
     }
 
-    public async Task Install(string sequenceKey, SqlConnection conn, SqlTransaction trans)
+    public async Task Install(string receiverSequenceKey, SqlConnection conn, SqlTransaction trans)
     {
-        var lo = $"Outbox_{sequenceKey}_1";
-        var hi = $"Outbox_{sequenceKey}_2";
+        var lo = $"Outbox_{sourceSequenceKey}_{receiverSequenceKey}_1";
+        var hi = $"Outbox_{sourceSequenceKey}_{receiverSequenceKey}_2";
 
         await CreateWatermarksTable(conn, trans).ConfigureAwait(false);
 
@@ -36,14 +34,14 @@ class OutboxPersistence
         await CreateTable(hi, conn, trans).ConfigureAwait(false);
         await CreateConstraint(hi, epochSize, 2 * epochSize, conn, trans).ConfigureAwait(false);
 
-        await CreateSequence($"Sequence_{sequenceKey}", conn, trans).ConfigureAwait(false);
+        await CreateSequence($"Sequence_{sourceSequenceKey}_{receiverSequenceKey}", conn, trans).ConfigureAwait(false);
 
-        await InsertWatermarks(sequenceKey, 0, 2 * epochSize, conn, trans);
+        await InsertWatermarks(receiverSequenceKey, 0, 2 * epochSize, conn, trans);
     }
 
-    static Task InsertWatermarks(string sequence, long lo, long hi, SqlConnection conn, SqlTransaction trans)
+    Task InsertWatermarks(string sequence, long lo, long hi, SqlConnection conn, SqlTransaction trans)
     {
-        using (var command = new SqlCommand(@"insert into WaterMarks (Destination, Lo, Hi) values (@dest, @lo, @hi)", conn, trans))
+        using (var command = new SqlCommand($"insert into [Outbox_WaterMarks_{sourceSequenceKey}] (Destination, Lo, Hi) values (@dest, @lo, @hi)", conn, trans))
         {
             command.Parameters.AddWithValue("@dest", sequence);
             command.Parameters.AddWithValue("lo", lo);
@@ -52,17 +50,17 @@ class OutboxPersistence
         }
     }
 
-    static Task CreateWatermarksTable(SqlConnection conn, SqlTransaction trans)
+    Task CreateWatermarksTable(SqlConnection conn, SqlTransaction trans)
     {
-        var script = @"
+        var script = $@"
 IF EXISTS (
     SELECT *
     FROM sys.objects
-    WHERE object_id = OBJECT_ID(N'[dbo].[WaterMarks]')
+    WHERE object_id = OBJECT_ID(N'[dbo].[Outbox_WaterMarks_{sourceSequenceKey}]')
         AND type = 'U')
-DROP TABLE [dbo].[WaterMarks]
+DROP TABLE [dbo].[Outbox_WaterMarks_{sourceSequenceKey}]
 
-CREATE TABLE [dbo].[WaterMarks](
+CREATE TABLE [dbo].[Outbox_WaterMarks_{sourceSequenceKey}](
 	[Destination] [nvarchar](200) NOT NULL,
 	[Lo] [bigint] NOT NULL,
 	[Hi] [bigint] NOT NULL
@@ -132,23 +130,33 @@ CREATE SEQUENCE [dbo].[{name}] AS [bigint] START WITH 0 INCREMENT BY 1";
     async Task Store(CapturedTransportOperation operation, Action<string, long> updateSequence, SqlConnection conn, SqlTransaction trans)
     {
         var sequenceKey = operation.Destination;
-        var message = Convert(operation.Operation, operation.Destination);
-
         var seq = await GetNextSequenceValue(sequenceKey, conn, trans).ConfigureAwait(false);
+        try
+        {
+            var message = Convert(operation.OutgoingMessage, operation.Destination);
 
-        operation.AssignSequence(seq);
-        updateSequence(sequenceKey, seq);
+            operation.OutgoingMessage.Headers["NServiceBus.Router.SequenceNumber"] = seq.ToString();
+            operation.OutgoingMessage.Headers["NServiceBus.Router.SequenceKey"] = sourceSequenceKey;
 
-        var tableName = GetTableName(seq, sequenceKey);
+            operation.AssignSequence(seq);
+            updateSequence(sequenceKey, seq);
 
-        await Insert(message, tableName, seq, conn, trans);
+            var tableName = GetTableName(seq, sequenceKey);
+
+            await Insert(message, tableName, seq, conn, trans);
+        }
+        catch (Exception ex)
+        {
+            log.Debug($"Unhandled exception while storing outbox operation with sequence {seq}", ex);
+            throw;
+        }
     }
 
     string GetTableName(long seq, string sequenceKey)
     {
         var side = (seq / epochSize) % 2;
 
-        var tableName = $"Outbox_{sequenceKey}_{side + 1}";
+        var tableName = $"Outbox_{sourceSequenceKey}_{sequenceKey}_{side + 1}";
         return tableName;
     }
 
@@ -168,7 +176,7 @@ insert into [{tableName}] (Seq, MessageId, Headers, Body, Options, Dispatched, I
     }
 
     public async Task<(long Lo, long Hi)> TryClose(string sequenceKey, long prevLo, long prevHi,
-        Func<TransportOperation, Task> dispatch, SqlConnection conn)
+        Func<OutgoingMessage, Task> dispatch, SqlConnection conn)
     {
         //Let's actually check if our values are correct.
         var (lo, hi) = await GetWaterMarks(sequenceKey, conn);
@@ -181,16 +189,11 @@ insert into [{tableName}] (Seq, MessageId, Headers, Body, Options, Dispatched, I
 
         var tableName = GetTableName(lo, sequenceKey);
 
-        if (await HasHoles(tableName, conn).ConfigureAwait(false))
-        {
-            log.Debug($"Epoch table {tableName} seems to have holes in the sequence. Attempting to plug them.");
-            var holes = await FindHoles(tableName, hi, conn).ConfigureAwait(false);
+        var holes = await FindHoles(tableName, hi, conn).ConfigureAwait(false);
 
-            if (!holes.Any())
-            {
-                log.Debug($"Cannot close epoch table {tableName}. Table is empty.");
-                return (lo, hi);
-            }
+        if (holes.Any())
+        {
+            log.Debug($"Outbox table {tableName} seems to have holes in the sequence. Attempting to plug them.");
 
             //Plug missing row holes by inserting dummy rows
             foreach (var hole in holes.Where(h => h.Type == HoleType.MissingRow))
@@ -203,31 +206,31 @@ insert into [{tableName}] (Seq, MessageId, Headers, Body, Options, Dispatched, I
             //Dispatch all the holes and mark them as dispatched
             foreach (var hole in holes)
             {
-                TransportOperation op;
+                OutgoingMessage message;
                 if (hole.Type == HoleType.MissingRow)
                 {
-                    op = CreatePlugOperation(hole.Id, sequenceKey);
+                    message = CreatePlugMessage(hole.Id, sequenceKey);
                     log.Debug($"Dispatching dummy message row {hole.Id}.");
                 }
                 else
                 {
-                    op = await LoadOperationById(hole.Id, tableName, conn).ConfigureAwait(false);
-                    log.Debug($"Dispatching message {hole.Id} with ID {op.Message.MessageId}.");
+                    message = await LoadMessageById(hole.Id, tableName, conn).ConfigureAwait(false);
+                    log.Debug($"Dispatching message {hole.Id} with ID {message.MessageId}.");
                 }
 
-                await dispatch(op).ConfigureAwait(false);
+                await dispatch(message).ConfigureAwait(false);
                 await MarkAsDispatched(tableName, hole.Id, conn, null).ConfigureAwait(false);
             }
         }
 
-        log.Debug($"Closing epoch table {tableName}.");
+        log.Debug($"Closing outbox table {tableName}.");
         using (var closeTransaction = conn.BeginTransaction())
         {
             //Ensure only one process can enter here
             var (lockedLo, lockedHi) = await GetWaterMarksWithLock(sequenceKey, conn, closeTransaction);
             if (lo != lockedLo || hi != lockedHi)
             {
-                log.Debug($"Watermark values read in transaction don't match previous values. Somebody else has closed epoch table {tableName}.");
+                log.Debug($"Watermark values read in transaction don't match previous values. Somebody else has closed outbox table {tableName}.");
                 return (lockedLo, lockedHi);
             }
 
@@ -249,18 +252,19 @@ insert into [{tableName}] (Seq, MessageId, Headers, Body, Options, Dispatched, I
         }
     }
 
-    static TransportOperation CreatePlugOperation(long seq, string destination)
+    OutgoingMessage CreatePlugMessage(long seq, string destination)
     {
         var headers = new Dictionary<string, string>
         {
-            ["NServiceBus.Router.Sequence"] = seq.ToString(),
+            ["NServiceBus.Router.SequenceNumber"] = seq.ToString(),
+            ["NServiceBus.Router.SequenceKey"] = sourceSequenceKey,
             ["NServiceBus.Router.Plug"] = "true"
         };
         var message = new OutgoingMessage(Guid.NewGuid().ToString(), headers, new byte[0]);
-        return new TransportOperation(message, new UnicastAddressTag(destination));
+        return message;
     }
 
-    static async Task<TransportOperation> LoadOperationById(long seq, string tableName, SqlConnection conn)
+    async Task<OutgoingMessage> LoadMessageById(long seq, string tableName, SqlConnection conn)
     {
         using (var command = new SqlCommand($@"
 select MessageId, Headers, Body, Options from [{tableName}] where Seq = @seq
@@ -278,10 +282,11 @@ select MessageId, Headers, Body, Options from [{tableName}] where Seq = @seq
                 var messageId = reader.GetString(0);
                 var headersSerialized = await GetText(reader, 1);
                 var body = await GetBody(reader, 2);
-                var options = await GetText(reader, 3);
 
-                var message = new PersistentOutboxTransportOperation(messageId, DictionarySerializer.Deserialize(options), body, DictionarySerializer.Deserialize(headersSerialized));
-                return Convert(message);
+                var headers = DictionarySerializer.Deserialize(headersSerialized);
+
+                var message = new OutgoingMessage(messageId, headers, body);
+                return message;
             }
         }
     }
@@ -301,6 +306,10 @@ select MessageId, Headers, Body, Options from [{tableName}] where Seq = @seq
 
     static async Task<byte[]> GetBody(SqlDataReader dataReader, int bodyIndex)
     {
+        if (await dataReader.IsDBNullAsync(bodyIndex).ConfigureAwait(false))
+        {
+            return null;
+        }
         // Null values will be returned as an empty (zero bytes) Stream.
         using (var outStream = new MemoryStream())
         using (var stream = dataReader.GetStream(bodyIndex))
@@ -394,7 +403,7 @@ end
         using (var command = new SqlCommand($@"
 select PrevSeq, Seq, NextSeq, Dispatched
 from (select Seq, LAG(Seq) over (order by Seq) PrevSeq, LEAD(Seq) over (order by Seq) NextSeq, Dispatched from [{tableName}]) q 
-	where (PrevSeq is null and Seq > @lo) 
+	where (PrevSeq is null and Seq >= @lo) 
     or (NextSeq is null and Seq < @hi) 
     or (PrevSeq <> Seq - 1) 
     or (NextSeq <> Seq + 1)
@@ -406,10 +415,13 @@ order by Seq
             var lo = highWaterMark - epochSize - epochSize;
             command.Parameters.AddWithValue("@hi", hi);
             command.Parameters.AddWithValue("@lo", lo);
+
+            var empty = true;
             using (var reader = await command.ExecuteReaderAsync().ConfigureAwait(false))
             {
                 while (reader.Read())
                 {
+                    empty = false;
                     var dispatched = reader.GetBoolean(3);
                     if (!dispatched)
                     {
@@ -418,7 +430,7 @@ order by Seq
 
                     if (reader.IsDBNull(0))
                     {
-                        AddHoles(0, reader.GetInt64(1) - 1, holes);
+                        AddHoles(lo, reader.GetInt64(1) - 1, holes);
                     }
                     if (reader.IsDBNull(2))
                     {
@@ -429,6 +441,11 @@ order by Seq
                         AddHoles(reader.GetInt64(1) + 1, reader.GetInt64(2) - 1, holes);
                     }
                 }
+            }
+            //If the table is empty, all rows are holes
+            if (empty)
+            {
+                AddHoles(lo, hi, holes);
             }
         }
         return holes;
@@ -442,9 +459,9 @@ order by Seq
         }
     }
 
-    static async Task<(long Lo, long High)> GetWaterMarks(string sequenceKey, SqlConnection conn)
+    async Task<(long Lo, long High)> GetWaterMarks(string sequenceKey, SqlConnection conn)
     {
-        using (var command = new SqlCommand("select Lo, Hi from WaterMarks where Destination = @key", conn))
+        using (var command = new SqlCommand($"select Lo, Hi from [Outbox_WaterMarks_{sourceSequenceKey}] where Destination = @key", conn))
         {
             command.Parameters.AddWithValue("@key", sequenceKey);
             using (var reader = await command.ExecuteReaderAsync().ConfigureAwait(false))
@@ -458,9 +475,9 @@ order by Seq
         }
     }
 
-    static async Task<(long Lo, long High)> GetWaterMarksWithLock(string sequenceKey, SqlConnection conn, SqlTransaction trans)
+    async Task<(long Lo, long High)> GetWaterMarksWithLock(string sequenceKey, SqlConnection conn, SqlTransaction trans)
     {
-        using (var command = new SqlCommand("select Lo, Hi from WaterMarks with (updlock) where Destination = @key", conn, trans))
+        using (var command = new SqlCommand($"select Lo, Hi from [Outbox_WaterMarks_{sourceSequenceKey}] with (updlock) where Destination = @key", conn, trans))
         {
             command.Parameters.AddWithValue("@key", sequenceKey);
             using (var reader = await command.ExecuteReaderAsync().ConfigureAwait(false))
@@ -474,9 +491,9 @@ order by Seq
         }
     }
 
-    static async Task UpdateWaterMarks(string sequenceKey, long lo, long hi, SqlConnection conn, SqlTransaction trans)
+    async Task UpdateWaterMarks(string sequenceKey, long lo, long hi, SqlConnection conn, SqlTransaction trans)
     {
-        using (var command = new SqlCommand("update WaterMarks set Lo = @lo, Hi = @hi where Destination = @key", conn, trans))
+        using (var command = new SqlCommand($"update [Outbox_WaterMarks_{sourceSequenceKey}] set Lo = @lo, Hi = @hi where Destination = @key", conn, trans))
         {
             command.Parameters.AddWithValue("@key", sequenceKey);
             command.Parameters.AddWithValue("@lo", lo);
@@ -487,7 +504,7 @@ order by Seq
 
     async Task<long> GetNextSequenceValue(string sequenceKey, SqlConnection conn, SqlTransaction trans)
     {
-        using (var command = new SqlCommand($"select next value for [Sequence_{sequenceKey}]", conn, trans))
+        using (var command = new SqlCommand($"select next value for [Sequence_{sourceSequenceKey}_{sequenceKey}]", conn, trans))
         {
             var value = (long)await command.ExecuteScalarAsync().ConfigureAwait(false);
             return value;
@@ -510,76 +527,18 @@ order by Seq
         return new TransportOperation(
             message,
             DeserializeRoutingStrategy(persistentOp.Options),
-            DispatchConsistency.Isolated,
-            DeserializeConstraints(persistentOp.Options));
+            DispatchConsistency.Isolated);
     }
 
-    static PersistentOutboxTransportOperation Convert(TransportOperation operation, string destination)
+    static PersistentOutboxTransportOperation Convert(OutgoingMessage message, string destination)
     {
-        var options = new Dictionary<string, string>();
-
-        foreach (var constraint in operation.DeliveryConstraints)
+        var options = new Dictionary<string, string>
         {
-            SerializeDeliveryConstraint(constraint, options);
-        }
+            ["Destination"] = destination
+        };
 
-        options["Destination"] = destination;
-
-        var persistentOp = new PersistentOutboxTransportOperation(operation.Message.MessageId, options, operation.Message.Body, operation.Message.Headers);
+        var persistentOp = new PersistentOutboxTransportOperation(message.MessageId, options, message.Body, message.Headers);
         return persistentOp;
-    }
-
-    static void SerializeDeliveryConstraint(DeliveryConstraint constraint, Dictionary<string, string> options)
-    {
-        if (constraint is NonDurableDelivery)
-        {
-            options["NonDurable"] = true.ToString();
-            return;
-        }
-        if (constraint is DoNotDeliverBefore doNotDeliverBefore)
-        {
-            options["DeliverAt"] = DateTimeExtensions.ToWireFormattedString(doNotDeliverBefore.At);
-            return;
-        }
-
-        if (constraint is DelayDeliveryWith delayDeliveryWith)
-        {
-            options["DelayDeliveryFor"] = delayDeliveryWith.Delay.ToString();
-            return;
-        }
-
-        if (constraint is DiscardIfNotReceivedBefore discard)
-        {
-            options["TimeToBeReceived"] = discard.MaxTime.ToString();
-            return;
-        }
-
-        throw new Exception($"Unknown delivery constraint {constraint.GetType().FullName}");
-    }
-
-    static List<DeliveryConstraint> DeserializeConstraints(Dictionary<string, string> options)
-    {
-        var constraints = new List<DeliveryConstraint>(4);
-        if (options.ContainsKey("NonDurable"))
-        {
-            constraints.Add(new NonDurableDelivery());
-        }
-
-        if (options.TryGetValue("DeliverAt", out var deliverAt))
-        {
-            constraints.Add(new DoNotDeliverBefore(DateTimeExtensions.ToUtcDateTime(deliverAt)));
-        }
-
-        if (options.TryGetValue("DelayDeliveryFor", out var delay))
-        {
-            constraints.Add(new DelayDeliveryWith(TimeSpan.Parse(delay)));
-        }
-
-        if (options.TryGetValue("TimeToBeReceived", out var ttbr))
-        {
-            constraints.Add(new DiscardIfNotReceivedBefore(TimeSpan.Parse(ttbr)));
-        }
-        return constraints;
     }
 
     static AddressTag DeserializeRoutingStrategy(Dictionary<string, string> options)

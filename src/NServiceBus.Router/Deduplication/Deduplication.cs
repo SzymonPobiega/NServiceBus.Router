@@ -17,17 +17,21 @@
 
             configAction(settings);
 
-            var outboxPersistence = new OutboxPersistence(settings.EpochSizeValue);
+            var outboxPersistence = new OutboxPersistence(settings.EpochSizeValue, routerConfig.Name);
+            var inboxPersistence = new InboxPersitence(settings.EpochSizeValue, routerConfig.Name);
 
             var dispatcher = new Dispatcher(settings, outboxPersistence, settings.ConnFactory);
-            var epochManager = new EpochManager(settings, outboxPersistence, settings.ConnFactory);
+            var outboxCleanerCollection = new OutboxCleanerCollection(settings, outboxPersistence);
+            var inboxCleanerCollection = new InboxCleanerCollection(settings, inboxPersistence);
 
-            routerConfig.Modules.Add(new Installer(settings, outboxPersistence, settings.ConnFactory));
+            routerConfig.Modules.Add(new Installer(settings, outboxPersistence, inboxPersistence, settings.ConnFactory));
             routerConfig.Modules.Add(dispatcher);
-            routerConfig.Modules.Add(epochManager);
+            routerConfig.Modules.Add(outboxCleanerCollection);
+            routerConfig.Modules.Add(inboxCleanerCollection);
 
             routerConfig.AddRule(_ => new CaptureOutgoingMessageRule(settings));
-            routerConfig.AddRule(_ => new OutboxRule(outboxPersistence, epochManager, dispatcher));
+            routerConfig.AddRule(_ => new OutboxRule(outboxPersistence, outboxCleanerCollection, dispatcher));
+            routerConfig.AddRule(_ => new InboxRule(inboxPersistence, inboxCleanerCollection, settings));
 
             return settings;
         }

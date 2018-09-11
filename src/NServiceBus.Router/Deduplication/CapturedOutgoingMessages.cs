@@ -24,9 +24,9 @@
 
     class CapturedTransportOperation
     {
-        public CapturedTransportOperation(TransportOperation operation, string destination)
+        public CapturedTransportOperation(OutgoingMessage outgoingMessage, string destination)
         {
-            Operation = operation;
+            OutgoingMessage = outgoingMessage;
             Destination = destination;
         }
 
@@ -35,7 +35,7 @@
             Sequence = sequence;
         }
 
-        public TransportOperation Operation { get; }
+        public OutgoingMessage OutgoingMessage { get; }
         public string Destination { get; }
         public long Sequence { get; private set; }
     }

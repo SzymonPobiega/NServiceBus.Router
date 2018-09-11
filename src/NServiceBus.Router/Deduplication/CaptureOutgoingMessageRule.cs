@@ -3,9 +3,8 @@
     using System;
     using System.Collections.Generic;
     using System.Threading.Tasks;
-    using Routing;
 
-    class CaptureOutgoingMessageRule : IRule<PostroutingContext, PostroutingContext>
+    class CaptureOutgoingMessageRule : IRule<AnycastContext, AnycastContext>
     {
         SqlDeduplicationSettings settings;
 
@@ -14,7 +13,7 @@
             this.settings = settings;
         }
 
-        public Task Invoke(PostroutingContext context, Func<PostroutingContext, Task> next)
+        public Task Invoke(AnycastContext context, Func<AnycastContext, Task> next)
         {
             if (!settings.IsOutboxEnabledFor(context.Interface))
             {
@@ -23,19 +22,12 @@
 
             if (context.Extensions.TryGet<List<CapturedTransportOperation>>(out var capturedMessages))
             {
-                foreach (var operation in context.Messages)
+                if (!settings.IsOutboxEnabledFor(context.Interface, context.DestinationEndpoint))
                 {
-                    if (!(operation.AddressTag is UnicastAddressTag unicastTag))
-                    {
-                        throw new Exception("Only unicast operations can be ordered.");
-                    }
-                    if (!settings.IsOutboxEnabledFor(context.Interface, unicastTag.Destination))
-                    {
-                        throw new Exception($"Total ordering is not enabled for destination {unicastTag.Destination} via interface {context.Interface}.");
-                    }
-                    capturedMessages.Add(new CapturedTransportOperation(operation, unicastTag.Destination));
+                    throw new Exception($"Total ordering is not enabled for destination {context.DestinationEndpoint} via interface {context.Interface}.");
                 }
-                
+                capturedMessages.Add(new CapturedTransportOperation(context.Message, context.DestinationEndpoint));
+
                 //Do not forward the invocation to the terminator
                 return Task.CompletedTask;
             }
