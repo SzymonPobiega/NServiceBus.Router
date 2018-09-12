@@ -3,13 +3,6 @@ using System.Data.SqlClient;
 using System.Threading.Tasks;
 using NServiceBus.Logging;
 
-class WatermarkViolationException : Exception
-{
-    public WatermarkViolationException(string message) : base(message)
-    {
-    }
-}
-
 class InboxPersister
 {
     int epochSize;
@@ -117,37 +110,10 @@ CREATE TABLE [dbo].[{name}] (
 
             throw;
         }
-        catch (WatermarkViolationException)
-        {
-            return InboxDeduplicationResult.WatermarkViolation;
-        }
     }
 
     async Task Insert(string messageId, string sequenceKey, int seq, string tableName, SqlConnection conn, SqlTransaction trans)
     {
-//        using (var command = new SqlCommand($@"
-//insert into [{tableName}] (Seq, MessageId) values (@seq, @messageId);
-//select Lo, Hi from [Inbox_WaterMarks_{destinationSequenceKey}] where Source = @key;", conn, trans))
-//        {
-//            command.Parameters.AddWithValue("@seq", seq);
-//            command.Parameters.AddWithValue("@key", sequenceKey);
-//            command.Parameters.AddWithValue("@messageId", messageId);
-//            using (var reader = await command.ExecuteReaderAsync().ConfigureAwait(false))
-//            {
-//                if (!reader.Read())
-//                {
-//                    throw new Exception($"No water marks for sequence {sequenceKey}");
-//                }
-
-//                var lo = reader.GetInt64(0);
-//                var hi = reader.GetInt64(1);
-//                if (seq < lo || seq >= hi)
-//                {
-//                    throw new WatermarkViolationException($"Sequence {seq} value outside of watermarks [{lo}, {hi})");
-//                }
-//            }
-//        }
-
         using (var command = new SqlCommand($@"
 insert into [{tableName}] (Seq, MessageId) values (@seq, @messageId)", conn, trans))
         {
