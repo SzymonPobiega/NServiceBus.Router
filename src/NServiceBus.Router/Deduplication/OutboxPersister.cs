@@ -10,13 +10,13 @@ using NServiceBus.Routing;
 using NServiceBus.Transport;
 using TransportOperation = NServiceBus.Transport.TransportOperation;
 
-class OutboxPersistence
+class OutboxPersister
 {
     int epochSize;
     string sourceSequenceKey;
-    static ILog log = LogManager.GetLogger<OutboxPersistence>();
+    static ILog log = LogManager.GetLogger<OutboxPersister>();
 
-    public OutboxPersistence(int epochSize, string sourceSequenceKey)
+    public OutboxPersister(int epochSize, string sourceSequenceKey)
     {
         this.epochSize = epochSize;
         this.sourceSequenceKey = sourceSequenceKey;
@@ -135,8 +135,8 @@ CREATE SEQUENCE [dbo].[{name}] AS [bigint] START WITH 0 INCREMENT BY 1";
         {
             var message = Convert(operation.OutgoingMessage, operation.Destination);
 
-            operation.OutgoingMessage.Headers["NServiceBus.Router.SequenceNumber"] = seq.ToString();
-            operation.OutgoingMessage.Headers["NServiceBus.Router.SequenceKey"] = sourceSequenceKey;
+            operation.OutgoingMessage.Headers[RouterHeaders.SequenceNumber] = seq.ToString();
+            operation.OutgoingMessage.Headers[RouterHeaders.SequenceKey] = sourceSequenceKey;
 
             operation.AssignSequence(seq);
             updateSequence(sequenceKey, seq);
@@ -189,37 +189,40 @@ insert into [{tableName}] (Seq, MessageId, Headers, Body, Options, Dispatched, I
 
         var tableName = GetTableName(lo, sequenceKey);
 
-        var holes = await FindHoles(tableName, hi, conn).ConfigureAwait(false);
-
-        if (holes.Any())
+        if (await HasHoles(tableName, conn).ConfigureAwait(false))
         {
-            log.Debug($"Outbox table {tableName} seems to have holes in the sequence. Attempting to plug them.");
+            var holes = await FindHoles(tableName, hi, conn).ConfigureAwait(false);
 
-            //Plug missing row holes by inserting dummy rows
-            foreach (var hole in holes.Where(h => h.Type == HoleType.MissingRow))
+            if (holes.Any())
             {
-                //If we blow here it means that some other process inserted rows after we looked for holes. We backtrack and come back
-                log.Debug($"Plugging hole {hole.Id} with a dummy message row.");
-                await PlugHole(tableName, hole.Id, conn).ConfigureAwait(false);
-            }
+                log.Debug($"Outbox table {tableName} seems to have holes in the sequence. Attempting to plug them.");
 
-            //Dispatch all the holes and mark them as dispatched
-            foreach (var hole in holes)
-            {
-                OutgoingMessage message;
-                if (hole.Type == HoleType.MissingRow)
+                //Plug missing row holes by inserting dummy rows
+                foreach (var hole in holes.Where(h => h.Type == HoleType.MissingRow))
                 {
-                    message = CreatePlugMessage(hole.Id, sequenceKey);
-                    log.Debug($"Dispatching dummy message row {hole.Id}.");
-                }
-                else
-                {
-                    message = await LoadMessageById(hole.Id, tableName, conn).ConfigureAwait(false);
-                    log.Debug($"Dispatching message {hole.Id} with ID {message.MessageId}.");
+                    //If we blow here it means that some other process inserted rows after we looked for holes. We backtrack and come back
+                    log.Debug($"Plugging hole {hole.Id} with a dummy message row.");
+                    await PlugHole(tableName, hole.Id, conn).ConfigureAwait(false);
                 }
 
-                await dispatch(message).ConfigureAwait(false);
-                await MarkAsDispatched(tableName, hole.Id, conn, null).ConfigureAwait(false);
+                //Dispatch all the holes and mark them as dispatched
+                foreach (var hole in holes)
+                {
+                    OutgoingMessage message;
+                    if (hole.Type == HoleType.MissingRow)
+                    {
+                        message = CreatePlugMessage(hole.Id);
+                        log.Debug($"Dispatching dummy message row {hole.Id}.");
+                    }
+                    else
+                    {
+                        message = await LoadMessageById(hole.Id, tableName, conn).ConfigureAwait(false);
+                        log.Debug($"Dispatching message {hole.Id} with ID {message.MessageId}.");
+                    }
+
+                    await dispatch(message).ConfigureAwait(false);
+                    await MarkAsDispatched(tableName, hole.Id, conn, null).ConfigureAwait(false);
+                }
             }
         }
 
@@ -252,13 +255,13 @@ insert into [{tableName}] (Seq, MessageId, Headers, Body, Options, Dispatched, I
         }
     }
 
-    OutgoingMessage CreatePlugMessage(long seq, string destination)
+    OutgoingMessage CreatePlugMessage(long seq)
     {
         var headers = new Dictionary<string, string>
         {
-            ["NServiceBus.Router.SequenceNumber"] = seq.ToString(),
-            ["NServiceBus.Router.SequenceKey"] = sourceSequenceKey,
-            ["NServiceBus.Router.Plug"] = "true"
+            [RouterHeaders.SequenceNumber] = seq.ToString(),
+            [RouterHeaders.SequenceKey] = sourceSequenceKey,
+            [RouterHeaders.Plug] = "true"
         };
         var message = new OutgoingMessage(Guid.NewGuid().ToString(), headers, new byte[0]);
         return message;
@@ -375,11 +378,15 @@ end
 
     async Task<bool> HasHoles(string tableName, SqlConnection conn)
     {
-        using (var command = new SqlCommand($"select count(Seq) from [{tableName}] with(nolock) where Dispatched = 1", conn))
+        //We can use a count query here because there is a check that ensure that inserting a message that is outside
+        //of watermarks cannot be comitted. If we count the non-locked (comitted) messages and the count is equal to epoch
+        //it means there is no holes
+        using (var command = new SqlCommand($"select count(Seq) from [{tableName}] with(readpast) where Dispatched = 1", conn))
         {
             var count = (int)await command.ExecuteScalarAsync().ConfigureAwait(false);
 
-            return count != epochSize;
+            var hasHoles = count < epochSize;
+            return hasHoles;
         }
     }
 

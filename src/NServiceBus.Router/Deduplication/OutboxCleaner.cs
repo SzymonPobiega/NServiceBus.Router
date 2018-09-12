@@ -12,15 +12,15 @@ class OutboxCleaner
     long lo;
     long hi;
     Task closeTask;
-    OutboxPersistence persistence;
+    OutboxPersister persister;
     Func<SqlConnection> connectionFactory;
     ILog logger = LogManager.GetLogger<OutboxCleaner>();
     AsyncManualResetEvent @event = new AsyncManualResetEvent();
 
-    public OutboxCleaner(string sequenceKey, OutboxPersistence persistence, Func<SqlConnection> connectionFactory)
+    public OutboxCleaner(string sequenceKey, OutboxPersister persister, Func<SqlConnection> connectionFactory)
     {
         this.sequenceKey = sequenceKey;
-        this.persistence = persistence;
+        this.persister = persister;
         this.connectionFactory = connectionFactory;
     }
 
@@ -43,7 +43,7 @@ class OutboxCleaner
 
                         logger.Debug($"Attempting to close epoch for sequence {sequenceKey} based on lo={lo} and hi={hi}");
 
-                        var (newLo, newHi) = await persistence.TryClose(sequenceKey, lo, hi, dispatch, conn);
+                        var (newLo, newHi) = await persister.TryClose(sequenceKey, lo, hi, dispatch, conn);
 
                         logger.Debug($"New values lo={lo} and hi={hi}");
 

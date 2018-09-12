@@ -15,9 +15,9 @@ class OutboxCleanerCollection : IModule
     CancellationTokenSource tokenSource;
     Dictionary<string, string> destinationToInterfaceMap;
 
-    public OutboxCleanerCollection(SqlDeduplicationSettings settings, OutboxPersistence persistence)
+    public OutboxCleanerCollection(SqlDeduplicationSettings settings, OutboxPersister persister)
     {
-        sequences = settings.GetAllDestinations().ToDictionary(d => d, d => new OutboxCleaner(d, persistence, settings.ConnFactory));
+        sequences = settings.GetAllDestinations().ToDictionary(d => d, d => new OutboxCleaner(d, persister, settings.ConnFactory));
         destinationToInterfaceMap = settings.GetAllDestinations().ToDictionary(d => d, d => settings.GetDestinationInterface(d));
     }
 

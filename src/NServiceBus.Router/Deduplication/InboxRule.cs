@@ -7,15 +7,15 @@ using NServiceBus.Transport;
 
 class InboxRule : IRule<RawContext, RawContext>
 {
-    InboxPersitence persitence;
+    InboxPersister persister;
     Func<SqlConnection> connectionFactory;
     InboxCleanerCollection cleanerCollection;
     SqlDeduplicationSettings settings;
     Task cleanUpBarrier = Task.CompletedTask;
 
-    public InboxRule(InboxPersitence persitence, InboxCleanerCollection cleanerCollection, SqlDeduplicationSettings settings)
+    public InboxRule(InboxPersister persister, InboxCleanerCollection cleanerCollection, SqlDeduplicationSettings settings)
     {
-        this.persitence = persitence;
+        this.persister = persister;
         connectionFactory = settings.ConnFactory;
         this.settings = settings;
         this.cleanerCollection = cleanerCollection;
@@ -31,7 +31,7 @@ class InboxRule : IRule<RawContext, RawContext>
             return;
         }
 
-        if (!context.Headers.TryGetValue("NServiceBus.Router.SequenceKey", out var seqKey))
+        if (!context.Headers.TryGetValue(RouterHeaders.SequenceKey, out var seqKey))
         {
             await next(context).ConfigureAwait(false);
             return;
@@ -42,12 +42,12 @@ class InboxRule : IRule<RawContext, RawContext>
             throw new UnforwardableMessageException($"Deduplication is not enabled for source {seqKey} via interface {context.Interface}");
         }
 
-        if (!context.Headers.TryGetValue("NServiceBus.Router.SequenceNumber", out var seqString))
+        if (!context.Headers.TryGetValue(RouterHeaders.SequenceNumber, out var seqString))
         {
             throw new UnforwardableMessageException("Missing required sequence value (NServiceBus.Router.SequenceNumber) on the message.");
         }
 
-        var isPlug = context.Headers.ContainsKey("NServiceBus.Router.Plug");
+        var isPlug = context.Headers.ContainsKey(RouterHeaders.Plug);
         var seq = int.Parse(seqString);
 
         using (var conn = connectionFactory())
@@ -56,7 +56,7 @@ class InboxRule : IRule<RawContext, RawContext>
 
             using (var trans = conn.BeginTransaction())
             {
-                var result = await persitence.Deduplicate(context.MessageId, seq, seqKey, conn, trans).ConfigureAwait(false);
+                var result = await persister.Deduplicate(context.MessageId, seq, seqKey, conn, trans).ConfigureAwait(false);
                 if (result == InboxDeduplicationResult.Duplicate)
                 {
                     return;

@@ -10,7 +10,7 @@ class InboxCleanerCollection : IModule
     Dictionary<string, InboxCleaner> sequences;
     CancellationTokenSource tokenSource;
 
-    public InboxCleanerCollection(SqlDeduplicationSettings settings, InboxPersitence persistence)
+    public InboxCleanerCollection(SqlDeduplicationSettings settings, InboxPersister persistence)
     {
         sequences = settings.GetAllSources().ToDictionary(s => s, d => new InboxCleaner(d, persistence, settings.ConnFactory));
     }

@@ -11,7 +11,7 @@ using NServiceBus.Transport;
 
 class Dispatcher : IModule
 {
-    OutboxPersistence persistence;
+    OutboxPersister persister;
     SqlDeduplicationSettings settings;
     BlockingCollection<CapturedTransportOperation> operationsQueue;
     Task loopTask;
@@ -19,10 +19,10 @@ class Dispatcher : IModule
     ILog logger = LogManager.GetLogger<Dispatcher>();
     Func<SqlConnection> connectionFactory;
 
-    public Dispatcher(SqlDeduplicationSettings settings, OutboxPersistence persistence, Func<SqlConnection> connectionFactory)
+    public Dispatcher(SqlDeduplicationSettings settings, OutboxPersister persister, Func<SqlConnection> connectionFactory)
     {
         this.settings = settings;
-        this.persistence = persistence;
+        this.persister = persister;
         this.connectionFactory = connectionFactory;
         operationsQueue = new BlockingCollection<CapturedTransportOperation>(50);
     }
@@ -90,7 +90,7 @@ class Dispatcher : IModule
             using (var trans = conn.BeginTransaction())
             {
                 //Will block until the record insert transaction is completed.
-                await persistence.MarkDispatched(operation, conn, trans).ConfigureAwait(false);
+                await persister.MarkDispatched(operation, conn, trans).ConfigureAwait(false);
 
                 var iface = settings.GetDestinationInterface(operation.Destination);
 

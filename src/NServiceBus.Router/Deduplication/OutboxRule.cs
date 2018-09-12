@@ -9,13 +9,13 @@
 
     class OutboxRule : IRule<RawContext, RawContext>
     {
-        OutboxPersistence persistence;
+        OutboxPersister persister;
         OutboxCleanerCollection outboxCleanerCollection;
         Dispatcher dispatcher;
 
-        public OutboxRule(OutboxPersistence persistence, OutboxCleanerCollection outboxCleanerCollection, Dispatcher dispatcher)
+        public OutboxRule(OutboxPersister persister, OutboxCleanerCollection outboxCleanerCollection, Dispatcher dispatcher)
         {
-            this.persistence = persistence;
+            this.persister = persister;
             this.outboxCleanerCollection = outboxCleanerCollection;
             this.dispatcher = dispatcher;
         }
@@ -38,7 +38,7 @@
             var connection = transportTransaction.Get<SqlConnection>();
             var transaction = transportTransaction.Get<SqlTransaction>();
 
-            await persistence.Store(capturedMessages, outboxCleanerCollection.UpdateInsertedSequence, connection, transaction).ConfigureAwait(false);
+            await persister.Store(capturedMessages, outboxCleanerCollection.UpdateInsertedSequence, connection, transaction).ConfigureAwait(false);
 
             foreach (var operation in capturedMessages)
             {

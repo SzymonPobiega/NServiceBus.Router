@@ -17,8 +17,8 @@
 
             configAction(settings);
 
-            var outboxPersistence = new OutboxPersistence(settings.EpochSizeValue, routerConfig.Name);
-            var inboxPersistence = new InboxPersitence(settings.EpochSizeValue, routerConfig.Name);
+            var outboxPersistence = new OutboxPersister(settings.EpochSizeValue, routerConfig.Name);
+            var inboxPersistence = new InboxPersister(settings.EpochSizeValue, routerConfig.Name);
 
             var dispatcher = new Dispatcher(settings, outboxPersistence, settings.ConnFactory);
             var outboxCleanerCollection = new OutboxCleanerCollection(settings, outboxPersistence);

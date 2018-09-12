@@ -10,13 +10,13 @@ class WatermarkViolationException : Exception
     }
 }
 
-class InboxPersitence
+class InboxPersister
 {
     int epochSize;
-    static ILog log = LogManager.GetLogger<InboxPersitence>();
+    static ILog log = LogManager.GetLogger<InboxPersister>();
     string destinationSequenceKey;
 
-    public InboxPersitence(int epochSize, string destinationSequenceKey)
+    public InboxPersister(int epochSize, string destinationSequenceKey)
     {
         this.epochSize = epochSize;
         this.destinationSequenceKey = destinationSequenceKey;

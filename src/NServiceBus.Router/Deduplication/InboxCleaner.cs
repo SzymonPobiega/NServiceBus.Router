@@ -11,13 +11,13 @@ class InboxCleaner
     long lo;
     long hi;
     Task closeTask;
-    InboxPersitence persistence;
+    InboxPersister persistence;
     Func<SqlConnection> connectionFactory;
     ILog logger = LogManager.GetLogger<InboxCleaner>();
     AsyncManualResetEvent @event = new AsyncManualResetEvent();
     volatile TaskCompletionSource<bool> cleanRunAwaitable = new TaskCompletionSource<bool>();
 
-    public InboxCleaner(string sourceSequenceKey, InboxPersitence persistence, Func<SqlConnection> connectionFactory)
+    public InboxCleaner(string sourceSequenceKey, InboxPersister persistence, Func<SqlConnection> connectionFactory)
     {
         this.sourceSequenceKey = sourceSequenceKey;
         this.persistence = persistence;
