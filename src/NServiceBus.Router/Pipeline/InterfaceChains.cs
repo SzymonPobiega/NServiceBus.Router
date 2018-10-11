@@ -1,22 +1,30 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using NServiceBus.Raw;
 using NServiceBus.Router;
 
 class InterfaceChains : IInterfaceChains
 {
     Dictionary<string, IChains> interfaceMap = new Dictionary<string, IChains>();
     List<RuleRegistration> rules = new List<RuleRegistration>();
+    List<Action<ChainBuilder, Dictionary<Type, object>>> chainRegistrations = new List<Action<ChainBuilder, Dictionary<Type, object>>>();
 
-    public IChain<RawContext> RegisterInterface(IRuleCreationContext context, string interfaceName, IRawEndpoint rawEndpoint)
+    public void AddChain<TInput>(Func<ChainBuilder, IChain<TInput>> chainDefinition)
+        where TInput : IRuleContext
+    {
+        chainRegistrations.Add((builder, registrations) =>
+        {
+            registrations[typeof(TInput)] = chainDefinition(builder);
+        });
+    }
+
+    public void InitializeInterface(string interfaceName, IRuleCreationContext context)
     {
         var applicableRules = rules.Where(r => r.Condition(context))
             .ToDictionary(r => r.Type, r => r.Constructor);
 
-        var chains = new Chains(new ChainBuilder(context, applicableRules));
+        var chains = new Chains(new ChainBuilder(context, applicableRules), chainRegistrations);
         interfaceMap[interfaceName] = chains;
-        return chains.Get<RawContext>();
     }
 
     public void AddRule<T>(Func<IRuleCreationContext, T> ruleConstructor, Func<IRuleCreationContext, bool> condition = null)

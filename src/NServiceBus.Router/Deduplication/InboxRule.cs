@@ -48,12 +48,14 @@ class InboxRule : IRule<RawContext, RawContext>
         }
 
         var isPlug = context.Headers.ContainsKey(RouterHeaders.Plug);
-        var seq = int.Parse(seqString);
+        if (!int.TryParse(seqString, out var seq))
+        {
+            throw new UnforwardableMessageException("Sequence number value has to be integer.");
+        }
 
         using (var conn = connectionFactory())
         {
             await conn.OpenAsync().ConfigureAwait(false);
-
             using (var trans = conn.BeginTransaction())
             {
                 var result = await persister.Deduplicate(context.MessageId, seq, seqKey, conn, trans).ConfigureAwait(false);
@@ -77,7 +79,9 @@ class InboxRule : IRule<RawContext, RawContext>
                         //The watermarks may be outdated (in which case the retry may solve it) or the
                         //Seq number might be too high for the inbox to fit in which case this exception
                         //will repeat triggering the throttled mode untill the table can be closed
-                        throw new Exception("Aborting forwarding due to check constraint violation. Re-processing should fix the issue.");
+                        throw new Exception("Aborting forwarding due to check constraint violation. "+
+                                            "Either watermarks are outdated and this is a valid duplicate (in which case the retry will solve the issue)" +
+                                            "or there is a hole in the sequence which prevents closing the epoch.");
                     }
                 }
 
@@ -85,21 +89,25 @@ class InboxRule : IRule<RawContext, RawContext>
 
                 if (!isPlug) //If message is only a plug we don't forward it
                 {
-                    var receivedTransportTransaction = context.Extensions.Get<TransportTransaction>();
-                    var sqlTransportTransaction = new TransportTransaction();
-                    sqlTransportTransaction.Set(conn);
-                    sqlTransportTransaction.Set(trans);
-
-                    context.Extensions.Set(sqlTransportTransaction);
-
-                    await next(context);
-
-                    context.Extensions.Set(receivedTransportTransaction);
-
+                    await Forward(context, next, conn, trans);
                 }
 
                 trans.Commit();
             }
         }
+    }
+
+    static async Task Forward(RawContext context, Func<RawContext, Task> next, SqlConnection conn, SqlTransaction trans)
+    {
+        var receivedTransportTransaction = context.Extensions.Get<TransportTransaction>();
+        var sqlTransportTransaction = new TransportTransaction();
+        sqlTransportTransaction.Set(conn);
+        sqlTransportTransaction.Set(trans);
+
+        context.Extensions.Set(sqlTransportTransaction);
+
+        await next(context);
+
+        context.Extensions.Set(receivedTransportTransaction);
     }
 }

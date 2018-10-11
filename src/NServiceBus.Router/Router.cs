@@ -1,6 +1,7 @@
 namespace NServiceBus.Router
 {
     using System;
+    using System.Collections.Generic;
     using System.Linq;
 
     /// <summary>
@@ -23,6 +24,23 @@ namespace NServiceBus.Router
 
             var chains = config.Chains;
 
+            chains.AddChain(cb => cb.Begin<RawContext>().AddSection<PreroutingContext>().Terminate());
+            chains.AddChain(cb => cb.Begin<SubscribePreroutingContext>().Terminate());
+            chains.AddChain(cb => cb.Begin<UnsubscribePreroutingContext>().Terminate());
+            chains.AddChain(cb => cb.Begin<SendPreroutingContext>().Terminate());
+            chains.AddChain(cb => cb.Begin<PublishPreroutingContext>().Terminate());
+            chains.AddChain(cb => cb.Begin<ReplyPreroutingContext>().Terminate());
+
+            chains.AddChain(cb => cb.Begin<ForwardSubscribeContext>().Terminate());
+            chains.AddChain(cb => cb.Begin<ForwardUnsubscribeContext>().Terminate());
+            chains.AddChain(cb => cb.Begin<ForwardSendContext>().Terminate());
+            chains.AddChain(cb => cb.Begin<ForwardPublishContext>().Terminate());
+            chains.AddChain(cb => cb.Begin<ForwardReplyContext>().Terminate());
+
+            chains.AddChain(cb => cb.Begin<AnycastContext>().AddSection<PostroutingContext>().Terminate());
+            chains.AddChain(cb => cb.Begin<MulticastContext>().AddSection<PostroutingContext>().Terminate());
+            chains.AddChain(cb => cb.Begin<PostroutingContext>().Terminate());
+
             chains.AddRule(_ => new RawToPreroutingConnector());
             chains.AddRule(_ => new PreroutingToSubscribePreroutingFork());
             chains.AddRule(_ => new PreroutingToSendPreroutingFork());
@@ -32,21 +50,20 @@ namespace NServiceBus.Router
 
             chains.AddRule(c => new DetectCyclesRule(c.Endpoint.EndpointName));
 
-            chains.AddRule(_ => new SubscribePreroutingTerminator(config.RoutingProtocol));
-            chains.AddRule(_ => new UnsubscribePreroutingTerminator(config.RoutingProtocol));
+            chains.AddRule(c => new SubscribePreroutingTerminator(config.RoutingProtocol, c.TypeGenerator));
+            chains.AddRule(c => new UnsubscribePreroutingTerminator(config.RoutingProtocol, c.TypeGenerator));
             chains.AddRule(_ => new SendPreroutingTerminator(config.RoutingProtocol));
-            chains.AddRule(_ => new PublishPreroutingTerminator(interfaces.Select(i => i.Name).ToArray()));
+            chains.AddRule(c => new PublishPreroutingTerminator(interfaces.Select(i => i.Name).ToArray(), c.TypeGenerator));
             chains.AddRule(_ => new ReplyPreroutingTerminator());
 
             chains.AddRule(_ => new FindSubscribeDestinationsByHeadersRule());
             chains.AddRule(_ => new FindUnsubscribeDestinationsByHeadersRule());
             chains.AddRule(_ => new FindSendDestinationsByHeadersRule());
 
-            var typeGenerator = new RuntimeTypeGenerator();
 
-            chains.AddRule(c => new ForwardPublishNativeRule(typeGenerator), c => c.HasNativePubSub());
-            chains.AddRule(c => new ForwardSubscribeNativeRule(c.Endpoint.SubscriptionManager, typeGenerator), c => c.HasNativePubSub());
-            chains.AddRule(c => new ForwardUnsubscribeNativeRule(c.Endpoint.SubscriptionManager, typeGenerator), c => c.HasNativePubSub());
+            chains.AddRule(c => new ForwardPublishNativeRule(), c => c.HasNativePubSub());
+            chains.AddRule(c => new ForwardSubscribeNativeRule(c.Endpoint.SubscriptionManager), c => c.HasNativePubSub());
+            chains.AddRule(c => new ForwardUnsubscribeNativeRule(c.Endpoint.SubscriptionManager), c => c.HasNativePubSub());
 
             chains.AddRule(c => new ForwardPublishStorageDrivenRule(c.SubscriptionPersistence, c.DistributionPolicy), c => !c.HasNativePubSub());
             chains.AddRule(c => new ForwardSubscribeMessageDrivenRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName), c => !c.HasNativePubSub());

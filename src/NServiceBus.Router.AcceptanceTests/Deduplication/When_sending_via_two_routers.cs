@@ -67,7 +67,7 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
                     Counter = 0
                 })))
                 .WithEndpoint<RedEndpoint>()
-                .Done(c => c.Counter > 200)
+                .Done(c => c.Counter > 10)
                 .Run(TimeSpan.FromSeconds(30));
         }
 

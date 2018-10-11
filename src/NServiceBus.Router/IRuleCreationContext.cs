@@ -33,6 +33,11 @@
         /// The endpoint associated with a given interface.
         /// </summary>
         IRawEndpoint Endpoint { get; }
+
+        /// <summary>
+        /// The type generator used to create type objects from message type strings.
+        /// </summary>
+        RuntimeTypeGenerator TypeGenerator { get; }
     }
 
     /// <summary>

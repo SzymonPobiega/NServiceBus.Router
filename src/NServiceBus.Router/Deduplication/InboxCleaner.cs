@@ -8,8 +8,8 @@ class InboxCleaner
 {
     string sourceSequenceKey;
     long lastReceived;
-    long lo;
-    long hi;
+    long cachedLo;
+    long cachedHi;
     Task closeTask;
     InboxPersister persistence;
     Func<SqlConnection> connectionFactory;
@@ -41,20 +41,20 @@ class InboxCleaner
                     {
                         await conn.OpenAsync().ConfigureAwait(false);
 
-                        logger.Debug($"Attempting to close epoch for sequence {sourceSequenceKey} based on lo={lo} and hi={hi}");
+                        logger.Debug($"Attempting to close the inbox table for sequence {sourceSequenceKey} based on lo={cachedLo} and hi={cachedHi}");
 
-                        var (newLo, newHi) = await persistence.TryClose(sourceSequenceKey, lo, hi, conn);
+                        var (newLo, newHi) = await persistence.TryClose(sourceSequenceKey, cachedLo, cachedHi, conn);
 
-                        logger.Debug($"New values lo={lo} and hi={hi}");
+                        logger.Debug($"New watermark values for inbox for {sourceSequenceKey} lo={cachedLo} and hi={cachedHi}");
 
                         @event.Reset();
-                        lo = newLo;
-                        hi = newHi;
+                        cachedLo = newLo;
+                        cachedHi = newHi;
                     }
                 }
                 catch (Exception e)
                 {
-                    logger.Error("Unexpected error while closing the epoch", e);
+                    logger.Error("Unexpected error while closing the inbox table", e);
                 }
                 finally
                 {
@@ -67,7 +67,7 @@ class InboxCleaner
 
     public async Task Stop()
     {
-        @event.Set();
+        @event.Cancel();
         try
         {
             await closeTask.ConfigureAwait(false);
@@ -80,12 +80,12 @@ class InboxCleaner
 
     public (Task cleanBarrier, WatermarkCheckViolationResult checkResult) CheckConstraintFailedFor(long sequenceValue, Task currentCleanBarrier)
     {
-        var localLo = Interlocked.Read(ref lo);
+        var localLo = Interlocked.Read(ref cachedLo);
         if (sequenceValue < localLo)
         {
             return (currentCleanBarrier, WatermarkCheckViolationResult.Duplicate);
         }
-        //Seems like our watermarks are off or the message sequence number does not fit. Trigger closing
+        //Seems like our watermarks values are stale or the message sequence number does not fit. Trigger closing.
         @event.Set();
 
         return (cleanRunAwaitable.Task, WatermarkCheckViolationResult.Retry);
@@ -93,31 +93,15 @@ class InboxCleaner
 
     public void UpdateReceivedSequence(long sequenceValue)
     {
-        var updated = InterlockedExchangeIfGreaterThan(ref lastReceived, sequenceValue);
-        var localHi = Interlocked.Read(ref hi);
-        var localLo = Interlocked.Read(ref lo);
+        var highestSeenSequenceValue = InterlocedEx.ExchangeIfGreaterThan(ref lastReceived, sequenceValue);
+        var localHi = Interlocked.Read(ref cachedHi);
+        var localLo = Interlocked.Read(ref cachedLo);
 
+        //Triggers the closing process if the last received sequence number is in the upper quarter of the window
         var epochSize = localHi - localLo;
-        if (updated < localLo + epochSize / 2 + epochSize / 4) //We have not got to the upper half of the upper epoch
+        if (highestSeenSequenceValue >= localLo + epochSize / 2 + epochSize / 4)
         {
-            return;
+            @event.Set();
         }
-
-        @event.Set();
-    }
-
-    static long InterlockedExchangeIfGreaterThan(ref long location, long newValue)
-    {
-        long initialValue;
-        do
-        {
-            initialValue = Interlocked.Read(ref location);
-            if (initialValue >= newValue)
-            {
-                return initialValue;
-            }
-        }
-        while (Interlocked.CompareExchange(ref location, newValue, initialValue) != initialValue);
-        return initialValue;
     }
 }

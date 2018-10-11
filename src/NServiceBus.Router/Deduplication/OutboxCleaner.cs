@@ -41,11 +41,11 @@ class OutboxCleaner
                     {
                         await conn.OpenAsync().ConfigureAwait(false);
 
-                        logger.Debug($"Attempting to close epoch for sequence {sequenceKey} based on lo={lo} and hi={hi}");
+                        logger.Debug($"Attempting to close the outbox table for sequence {sequenceKey} based on lo={lo} and hi={hi}");
 
                         var (newLo, newHi) = await persister.TryClose(sequenceKey, lo, hi, dispatch, conn);
 
-                        logger.Debug($"New values lo={lo} and hi={hi}");
+                        logger.Debug($"New watermark values for outbox for {sequenceKey} are lo={lo} and hi={hi}");
 
                         @event.Reset();
                         lo = newLo;
@@ -54,7 +54,7 @@ class OutboxCleaner
                 }
                 catch (Exception e)
                 {
-                    logger.Error("Unexpected error while closing the epoch", e);
+                    logger.Error("Unexpected error while closing the outbox table", e);
                 }
             }
         });
@@ -62,7 +62,7 @@ class OutboxCleaner
 
     public async Task Stop()
     {
-        @event.Set();
+        @event.Cancel();
         if (closeTask == null)
         {
             return;
@@ -79,32 +79,16 @@ class OutboxCleaner
 
     public void UpdateInsertedSequence(long sequenceValue)
     {
-        var updated = InterlockedExchangeIfGreaterThan(ref lastInserted, sequenceValue);
+        var highestSeenSequenceValue = InterlocedEx.ExchangeIfGreaterThan(ref lastInserted, sequenceValue);
         var localHi = Interlocked.Read(ref hi);
         var localLo = Interlocked.Read(ref lo);
 
         var epochSize = localHi - localLo;
 
-        if (updated < localLo + epochSize / 2 + epochSize / 4) //We have not got to the upper half of the upper epoch
+        //Triggers the closing process if the last received sequence number is in the upper quarter of the window
+        if (highestSeenSequenceValue >= localLo + epochSize / 2 + epochSize / 4)
         {
-            return;
+            @event.Set();
         }
-
-        @event.Set();
-    }
-
-    static long InterlockedExchangeIfGreaterThan(ref long location, long newValue)
-    {
-        long initialValue;
-        do
-        {
-            initialValue = Interlocked.Read(ref location);
-            if (initialValue >= newValue)
-            {
-                return initialValue;
-            }
-        }
-        while (Interlocked.CompareExchange(ref location, newValue, initialValue) != initialValue);
-        return initialValue;
     }
 }

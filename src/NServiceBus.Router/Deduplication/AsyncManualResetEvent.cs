@@ -15,6 +15,11 @@ class AsyncManualResetEvent
         completionSource.TrySetResult(true);
     }
 
+    public void Cancel()
+    {
+        completionSource.SetCanceled();
+    }
+
     public void Reset()
     {
         while (true)

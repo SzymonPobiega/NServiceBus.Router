@@ -12,42 +12,22 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
     using NServiceBus.AcceptanceTests;
     using NServiceBus.AcceptanceTests.EndpointTemplates;
     using NUnit.Framework;
+    using Resubscriber;
     using Serialization;
     using Settings;
     using Conventions = AcceptanceTesting.Customization.Conventions;
 
     [TestFixture]
-    public class When_publishing_from_asb_endpoint_oriented : NServiceBusAcceptanceTest
+    public class When_publishing_from_asb_endpoint_oriented_while_router_is_restarted : NServiceBusAcceptanceTest
     {
+        InMemorySubscriptionStorage subscriptionStorage = new InMemorySubscriptionStorage();
         static string PublisherEndpointName => Conventions.EndpointNamingConvention(typeof(Publisher));
 
         [Test]
         public async Task It_should_deliver_the_message_to_both_subscribers()
         {
             var result = await Scenario.Define<Context>()
-                .WithRouter("Router", (c, cfg) =>
-                {
-                    cfg.AddInterface<TestTransport>("Left", t => t.BrokerAlpha()).InMemorySubscriptions();
-                    var leftIface = cfg.AddInterface<AzureServiceBusTransport>("Right", t =>
-                    {
-                        var connString = Environment.GetEnvironmentVariable("AzureServiceBus.ConnectionString");
-                        t.ConnectionString(connString);
-                        var settings = t.GetSettings();
-
-                        var builder = new ConventionsBuilder(settings);
-                        builder.DefiningEventsAs(EventConvention);
-                        settings.Set<NServiceBus.Conventions>(builder.Conventions);
-
-                        var topology = t.UseEndpointOrientedTopology();
-                        topology.RegisterPublisher(typeof(MyAsbEvent), Conventions.EndpointNamingConvention(typeof(Publisher)));
-
-                        var serializer = Tuple.Create(new NewtonsoftSerializer() as SerializationDefinition, new SettingsHolder());
-                        settings.Set("MainSerializer", serializer);
-                    });
-                    leftIface.LimitMessageProcessingConcurrencyTo(1); //To ensure when tracer arrives the subscribe request has already been processed.;
-                    cfg.AddRule(_ => new SuppressTransactionScopeRule());
-                    cfg.UseStaticRoutingProtocol().AddForwardRoute("Left", "Right");
-                })
+                .WithRouter("Router", ConfigureRouter)
                 .WithEndpoint<Publisher>(c => c.When(x => x.EventSubscribed, s => s.Publish(new MyAsbEvent())))
                 .WithEndpoint<Subscriber>(c => c.When(async s =>
                 {
@@ -58,6 +38,51 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 .Run();
 
             Assert.IsTrue(result.EventDelivered);
+            Console.WriteLine("Restarting router");
+
+            result = await Scenario.Define<Context>()
+                .WithRouter("Router", ConfigureRouter)
+                .WithEndpoint<Publisher>(c => c.When(x => x.EndpointsStarted, s => s.Publish(new MyAsbEvent())))
+                .WithEndpoint<Subscriber>()
+                .Done(c => c.EventDelivered)
+                .Run();
+
+            Assert.IsTrue(result.EventDelivered);
+        }
+
+        void ConfigureRouter(Context c, RouterConfiguration cfg)
+        {
+            cfg.AddInterface<TestTransport>("Left", t => t.BrokerAlpha()).UseSubscriptionPersistence(subscriptionStorage);
+            var leftIface = cfg.AddInterface<AzureServiceBusTransport>("Right", t =>
+            {
+                var connString = Environment.GetEnvironmentVariable("AzureServiceBus.ConnectionString");
+                t.ConnectionString(connString);
+                var settings = t.GetSettings();
+
+                var builder = new ConventionsBuilder(settings);
+                builder.DefiningEventsAs(EventConvention);
+                settings.Set<NServiceBus.Conventions>(builder.Conventions);
+
+                var topology = t.UseEndpointOrientedTopology();
+                topology.RegisterPublisher(typeof(MyAsbEvent), Conventions.EndpointNamingConvention(typeof(Publisher)));
+
+                var serializer = Tuple.Create(new NewtonsoftSerializer() as SerializationDefinition, new SettingsHolder());
+                settings.Set("MainSerializer", serializer);
+            });
+            leftIface.LimitMessageProcessingConcurrencyTo(1); //To ensure when tracer arrives the subscribe request has already been processed.;
+            cfg.AddRule(_ => new SuppressTransactionScopeRule());
+            cfg.UseStaticRoutingProtocol().AddForwardRoute("Left", "Right");
+
+            cfg.EnableResubscriber<AzureServiceBusTransport>("Right", TimeSpan.FromSeconds(5), t =>
+            {
+                var connString = Environment.GetEnvironmentVariable("AzureServiceBus.ConnectionString");
+                t.ConnectionString(connString);
+                t.UseEndpointOrientedTopology();
+
+                var settings = t.GetSettings();
+                var serializer = Tuple.Create(new NewtonsoftSerializer() as SerializationDefinition, new SettingsHolder());
+                settings.Set("MainSerializer", serializer);
+            });
         }
 
         class SuppressTransactionScopeRule : IRule<RawContext, RawContext>
