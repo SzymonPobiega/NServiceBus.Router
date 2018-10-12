@@ -39,16 +39,19 @@ namespace NServiceBus.Router
 
         internal IEnumerable<string> GetOutgoingInterfaces(string incomingInterface, IEnumerable<Destination> destinations)
         {
-            return destinations.Select(d => GetOutgoingInterface(incomingInterface, d));
+            return destinations.Select(d => GetOutgoingInterface(incomingInterface, d)).Distinct();
         }
 
         internal IEnumerable<Route> Route(string incomingInterface, IEnumerable<Destination> destinations)
         {
-            return destinations.Select(d =>
+            foreach (var d in destinations)
             {
                 var nextHop = GetNextHop(incomingInterface, d);
-                return new Route(d.Endpoint, nextHop);
-            });
+                if (nextHop != null || d.Endpoint != null)
+                {
+                    yield return new Route(d.Endpoint, nextHop);
+                }
+            }
         }
 
         internal string GetOutgoingInterface(string incomingInterface, Destination dest)
@@ -71,7 +74,7 @@ namespace NServiceBus.Router
             var matchingEntry = entries.FirstOrDefault(e => e.DestinationFilter(incomingInterface, dest));
             if (matchingEntry != null)
             {
-                logger.Debug($"Using route {matchingEntry} to find next hop for message to {dest} coming via {incomingInterface}: {matchingEntry.Gateway}.");
+                logger.Debug($"Using route {matchingEntry} to find next hop for message to {dest} coming via {incomingInterface}: {matchingEntry.Gateway ?? "none"}.");
             }
             else if (defaultGateway != null)
             {

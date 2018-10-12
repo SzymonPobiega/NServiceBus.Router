@@ -29,6 +29,7 @@ class RuntimeTypeGenerator
                 assemblies[assembly] = moduleBuilder;
             }
         }
+
         Type result;
         lock (types)
         {
@@ -43,10 +44,12 @@ class RuntimeTypeGenerator
                     var path = string.Join("+", nestedParts.Take(i + 1));
                     typeBuilder = GetNestedTypeBuilder(typeBuilder, nestedParts[i], path);
                 }
+
                 result = typeBuilder.CreateTypeInfo();
                 types[messageType] = result;
             }
         }
+
         return result;
     }
 

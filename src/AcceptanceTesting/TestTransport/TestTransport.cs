@@ -1,12 +1,13 @@
 ﻿namespace NServiceBus
 {
+    using Routing;
     using Settings;
     using Transport;
 
     /// <summary>
     /// A transport optimized for development and learning use. DO NOT use in production.
     /// </summary>
-    public class TestTransport : TransportDefinition
+    public class TestTransport : TransportDefinition, IMessageDrivenSubscriptionTransport
     {
         /// <summary>
         /// Used by implementations to control if a connection string is necessary.

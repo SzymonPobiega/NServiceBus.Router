@@ -35,13 +35,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                     });
                     cfg.CircuitBreakerThreshold = int.MaxValue;
                     cfg.DelayedRetries = 0;
-                    cfg.InterceptForwarding((queue, message, dispatch, forward) =>
-                    {
-                        using (new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled))
-                        {
-                            return forward(dispatch);
-                        }
-                    });
+                    cfg.AddRule(_ => new SuppressTransactionScopeRule());
                     cfg.UseStaticRoutingProtocol().AddForwardRoute("Left", "Right");
                 })
                 .WithEndpoint<Sender>(c => c.When(s => s.Send(new MyRequest())))
@@ -51,6 +45,17 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
 
             Assert.IsTrue(result.RequestReceived);
             Assert.IsTrue(result.ResponseReceived);
+        }
+
+        class SuppressTransactionScopeRule : IRule<RawContext, RawContext>
+        {
+            public Task Invoke(RawContext context, Func<RawContext, Task> next)
+            {
+                using (new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled))
+                {
+                    return next(context);
+                }
+            }
         }
 
         class Context : ScenarioContext

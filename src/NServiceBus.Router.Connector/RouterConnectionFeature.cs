@@ -13,7 +13,7 @@ class RouterConnectionFeature : Feature
         var nativePubSub = transportInfra.OutboundRoutingPolicy.Publishes == OutboundRoutingType.Multicast;
         var settings = context.Settings.Get<RouterConnectionSettings>();
         var unicastRouteTable = context.Settings.Get<UnicastRoutingTable>();
-        var route = UnicastRoute.CreateFromPhysicalAddress(settings.RouterAddress);
+        var route = UnicastRoute.CreateFromEndpointName(settings.RouterAddress);
         var publishers = context.Settings.Get<Publishers>();
         var bindings = context.Settings.Get<QueueBindings>();
 
