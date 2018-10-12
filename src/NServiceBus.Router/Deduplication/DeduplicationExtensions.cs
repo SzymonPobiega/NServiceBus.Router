@@ -1,19 +1,20 @@
-﻿namespace NServiceBus.Router.Deduplication
+﻿namespace NServiceBus.Router
 {
     using System;
+    using Deduplication;
 
     /// <summary>
     /// Configures message deduplication based on sequence numbers.
     /// </summary>
-    public static class SqlDeduplication
+    public static class DeduplicationExtensions
     {
         /// <summary>
         /// Configures message deduplication based on sequence numbers.
         /// </summary>
         /// <returns></returns>
-        public static SqlDeduplicationSettings EnableSqlDeduplication(this RouterConfiguration routerConfig, Action<SqlDeduplicationSettings> configAction)
+        public static DeduplicationSettings EnableDeduplication(this RouterConfiguration routerConfig, Action<DeduplicationSettings> configAction)
         {
-            var settings = new SqlDeduplicationSettings();
+            var settings = new DeduplicationSettings();
 
             configAction(settings);
 
@@ -24,7 +25,11 @@
             var outboxCleanerCollection = new OutboxCleanerCollection(settings, outboxPersistence);
             var inboxCleanerCollection = new InboxCleanerCollection(settings, inboxPersistence);
 
-            routerConfig.Modules.Add(new Installer(settings, outboxPersistence, inboxPersistence, settings.ConnFactory));
+            if (settings.RunInstaller)
+            {
+                routerConfig.Modules.Add(new Installer(settings, outboxPersistence, inboxPersistence));
+            }
+
             routerConfig.Modules.Add(dispatcher);
             routerConfig.Modules.Add(outboxCleanerCollection);
             routerConfig.Modules.Add(inboxCleanerCollection);

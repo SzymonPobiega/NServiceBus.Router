@@ -1,5 +1,8 @@
-﻿enum WatermarkCheckViolationResult
+﻿namespace NServiceBus.Router.Deduplication
 {
-    Duplicate,
-    Retry
+    enum WatermarkCheckViolationResult
+    {
+        Duplicate,
+        Retry
+    }
 }

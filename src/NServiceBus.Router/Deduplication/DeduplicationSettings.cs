@@ -8,17 +8,19 @@
     /// <summary>
     /// Configures sequence-based deduplication.
     /// </summary>
-    public class SqlDeduplicationSettings
+    public class DeduplicationSettings
     {
         internal Func<SqlConnection> ConnFactory;
         internal int EpochSizeValue;
+        internal bool RunInstaller;
+        internal bool Uninstall;
         Dictionary<string, string> outboxInterfaceToDestinationMap = new Dictionary<string, string>();
         Dictionary<string, string> inboxInterfaceToSourceMap = new Dictionary<string, string>();
 
         /// <summary>
         /// Configures destination router for which the total order sequence should be generated.
         /// </summary>
-        public void EnsureTotalOrderOfOutgoingMessages(string outgoingInterface, string destinationRouter)
+        public void AddOutgoingLink(string outgoingInterface, string destinationRouter)
         {
             outboxInterfaceToDestinationMap[destinationRouter] = outgoingInterface;
         }
@@ -34,9 +36,27 @@
         /// <summary>
         /// Configures the source router which ensures total order of messages to allow deduplication.
         /// </summary>
-        public void DecuplicateIncomingMessagesBasedOnTotalOrder(string incomingInterface, string originRouter)
+        public void AddIncomingLink(string incomingInterface, string originRouter)
         {
             inboxInterfaceToSourceMap[originRouter] = incomingInterface;
+        }
+
+        /// <summary>
+        /// Enables installer to create database structure on startup.
+        /// </summary>
+        public void EnableInstaller()
+        {
+            RunInstaller = true;
+        }
+
+        /// <summary>
+        /// Enables installer to create database structure on startup.
+        /// </summary>
+        [Obsolete("Do not use this method for anything other than tests. It will delete your data.")]
+        public void EnableInstaller(bool uninstall)
+        {
+            RunInstaller = true;
+            Uninstall = uninstall;
         }
 
         /// <summary>

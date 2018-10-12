@@ -6,9 +6,9 @@
 
     class CaptureOutgoingMessageRule : IRule<AnycastContext, AnycastContext>
     {
-        SqlDeduplicationSettings settings;
+        DeduplicationSettings settings;
 
-        public CaptureOutgoingMessageRule(SqlDeduplicationSettings settings)
+        public CaptureOutgoingMessageRule(DeduplicationSettings settings)
         {
             this.settings = settings;
         }

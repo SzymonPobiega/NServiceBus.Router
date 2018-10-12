@@ -3,107 +3,107 @@ using System.Collections.Concurrent;
 using System.Data.SqlClient;
 using System.Threading;
 using System.Threading.Tasks;
-using NServiceBus;
 using NServiceBus.Logging;
-using NServiceBus.Router;
-using NServiceBus.Router.Deduplication;
 using NServiceBus.Transport;
 
-class Dispatcher : IModule
+namespace NServiceBus.Router.Deduplication
 {
-    OutboxPersister persister;
-    SqlDeduplicationSettings settings;
-    BlockingCollection<CapturedTransportOperation> operationsQueue;
-    Task loopTask;
-    CancellationTokenSource tokenSource;
-    ILog logger = LogManager.GetLogger<Dispatcher>();
-    Func<SqlConnection> connectionFactory;
-
-    public Dispatcher(SqlDeduplicationSettings settings, OutboxPersister persister, Func<SqlConnection> connectionFactory)
+    class Dispatcher : IModule
     {
-        this.settings = settings;
-        this.persister = persister;
-        this.connectionFactory = connectionFactory;
-        operationsQueue = new BlockingCollection<CapturedTransportOperation>(50);
-    }
+        OutboxPersister persister;
+        DeduplicationSettings settings;
+        BlockingCollection<CapturedTransportOperation> operationsQueue;
+        Task loopTask;
+        CancellationTokenSource tokenSource;
+        ILog logger = LogManager.GetLogger<Dispatcher>();
+        Func<SqlConnection> connectionFactory;
 
-    public void Enqueue(CapturedTransportOperation operation)
-    {
-        operationsQueue.Add(operation);
-    }
-
-    public Task Start(RootContext rootContext)
-    {
-        tokenSource = new CancellationTokenSource();
-        var throttle = new SemaphoreSlim(8);
-        loopTask = Task.Run(async () =>
+        public Dispatcher(DeduplicationSettings settings, OutboxPersister persister, Func<SqlConnection> connectionFactory)
         {
-            var consumer = operationsQueue.GetConsumingEnumerable(tokenSource.Token);
+            this.settings = settings;
+            this.persister = persister;
+            this.connectionFactory = connectionFactory;
+            operationsQueue = new BlockingCollection<CapturedTransportOperation>(50);
+        }
 
-            foreach (var operation in consumer)
+        public void Enqueue(CapturedTransportOperation operation)
+        {
+            operationsQueue.Add(operation);
+        }
+
+        public Task Start(RootContext rootContext)
+        {
+            tokenSource = new CancellationTokenSource();
+            var throttle = new SemaphoreSlim(8);
+            loopTask = Task.Run(async () =>
             {
-                await throttle.WaitAsync().ConfigureAwait(false);
-                var dispatchTask = Task.Run(async () =>
+                var consumer = operationsQueue.GetConsumingEnumerable(tokenSource.Token);
+
+                foreach (var operation in consumer)
                 {
-                    try
+                    await throttle.WaitAsync().ConfigureAwait(false);
+                    var dispatchTask = Task.Run(async () =>
                     {
-                        await Dispatch(operation, rootContext).ConfigureAwait(false);
-                    }
-                    catch (Exception e)
-                    {
+                        try
+                        {
+                            await Dispatch(operation, rootContext).ConfigureAwait(false);
+                        }
+                        catch (Exception e)
+                        {
                             //We can skip over messages because closing process will make sure all the messages are dispatched
                             //TODO: We might want some retries here.
                             logger.Error("Unhandled exception in the dispatcher", e);
-                    }
-                    finally
-                    {
-                        throttle.Release();
-                    }
-                });
-            }
-        });
-        return Task.CompletedTask;
-    }
-
-    public async Task Stop()
-    {
-        try
-        {
-            //TODO: Do we need both?
-            tokenSource.Cancel();
-            operationsQueue.CompleteAdding();
-
-            await loopTask.ConfigureAwait(false);
+                        }
+                        finally
+                        {
+                            throttle.Release();
+                        }
+                    });
+                }
+            });
+            return Task.CompletedTask;
         }
-        catch (OperationCanceledException)
-        {
-            //Ignore
-        }
-    }
 
-    async Task Dispatch(CapturedTransportOperation operation, RootContext rootContext)
-    {
-        using (var conn = connectionFactory())
+        public async Task Stop()
         {
-            await conn.OpenAsync().ConfigureAwait(false);
-
-            using (var trans = conn.BeginTransaction())
+            try
             {
-                //Will block until the record insert transaction is completed.
-                await persister.MarkDispatched(operation, conn, trans).ConfigureAwait(false);
+                //TODO: Do we need both?
+                tokenSource.Cancel();
+                operationsQueue.CompleteAdding();
 
-                var iface = settings.GetDestinationInterface(operation.Destination);
+                await loopTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                //Ignore
+            }
+        }
 
-                var chains = rootContext.Interfaces.GetChainsFor(iface);
-                var chain = chains.Get<AnycastContext>();
+        async Task Dispatch(CapturedTransportOperation operation, RootContext rootContext)
+        {
+            using (var conn = connectionFactory())
+            {
+                await conn.OpenAsync().ConfigureAwait(false);
 
-                var dispatchContext = new OutboxDispatchContext(rootContext, iface);
-                var forwardContext = new AnycastContext(operation.Destination, operation.OutgoingMessage, DistributionStrategyScope.Send, dispatchContext);
-                dispatchContext.Set(new TransportTransaction());
-                await chain.Invoke(forwardContext).ConfigureAwait(false);
+                using (var trans = conn.BeginTransaction())
+                {
+                    //Will block until the record insert transaction is completed.
+                    await persister.MarkDispatched(operation, conn, trans).ConfigureAwait(false);
 
-                //Only commit the transaction if the dispatch succeeded.
-                trans.Commit();
+                    var iface = settings.GetDestinationInterface(operation.Destination);
+
+                    var chains = rootContext.Interfaces.GetChainsFor(iface);
+                    var chain = chains.Get<AnycastContext>();
+
+                    var dispatchContext = new OutboxDispatchContext(rootContext, iface);
+                    var forwardContext = new AnycastContext(operation.Destination, operation.OutgoingMessage, DistributionStrategyScope.Send, dispatchContext);
+                    dispatchContext.Set(new TransportTransaction());
+                    await chain.Invoke(forwardContext).ConfigureAwait(false);
+
+                    //Only commit the transaction if the dispatch succeeded.
+                    trans.Commit();
+                }
             }
         }
     }

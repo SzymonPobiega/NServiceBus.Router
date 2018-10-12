@@ -1,19 +1,22 @@
 ﻿using System.Threading;
 
-static class InterlocedEx
+namespace NServiceBus.Router.Deduplication
 {
-    public static long ExchangeIfGreaterThan(ref long location, long newValue)
+    static class InterlocedEx
     {
-        long initialValue;
-        do
+        public static long ExchangeIfGreaterThan(ref long location, long newValue)
         {
-            initialValue = Interlocked.Read(ref location);
-            if (initialValue >= newValue)
+            long initialValue;
+            do
             {
-                return initialValue;
+                initialValue = Interlocked.Read(ref location);
+                if (initialValue >= newValue)
+                {
+                    return initialValue;
+                }
             }
+            while (Interlocked.CompareExchange(ref location, newValue, initialValue) != initialValue);
+            return initialValue;
         }
-        while (Interlocked.CompareExchange(ref location, newValue, initialValue) != initialValue);
-        return initialValue;
     }
 }

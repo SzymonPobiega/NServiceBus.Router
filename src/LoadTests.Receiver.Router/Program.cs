@@ -42,11 +42,11 @@ namespace LoadTests.Sender.Router
 
             if (deduplication)
             {
-                routerConfig.EnableSqlDeduplication(d =>
+                routerConfig.EnableDeduplication(d =>
                 {
                     d.EpochSize(epochSize);
                     d.ConnectionFactory(() => new SqlConnection(sqlConnectionString));
-                    d.DecuplicateIncomingMessagesBasedOnTotalOrder("Rabbit", "Sender.Router");
+                    d.AddIncomingLink("Rabbit", "Sender.Router");
                 });
             }
 

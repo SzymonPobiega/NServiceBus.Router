@@ -1,33 +1,36 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
 
-class AsyncManualResetEvent
+namespace NServiceBus.Router.Deduplication
 {
-    volatile TaskCompletionSource<bool> completionSource = new TaskCompletionSource<bool>();
-
-    public Task WaitAsync()
+    class AsyncManualResetEvent
     {
-        return completionSource.Task;
-    }
+        volatile TaskCompletionSource<bool> completionSource = new TaskCompletionSource<bool>();
 
-    public void Set()
-    {
-        completionSource.TrySetResult(true);
-    }
-
-    public void Cancel()
-    {
-        completionSource.SetCanceled();
-    }
-
-    public void Reset()
-    {
-        while (true)
+        public Task WaitAsync()
         {
-            var tcs = completionSource;
-            if (!tcs.Task.IsCompleted ||
-                Interlocked.CompareExchange(ref completionSource, new TaskCompletionSource<bool>(), tcs) == tcs)
-                return;
+            return completionSource.Task;
+        }
+
+        public void Set()
+        {
+            completionSource.TrySetResult(true);
+        }
+
+        public void Cancel()
+        {
+            completionSource.SetCanceled();
+        }
+
+        public void Reset()
+        {
+            while (true)
+            {
+                var tcs = completionSource;
+                if (!tcs.Task.IsCompleted ||
+                    Interlocked.CompareExchange(ref completionSource, new TaskCompletionSource<bool>(), tcs) == tcs)
+                    return;
+            }
         }
     }
 }

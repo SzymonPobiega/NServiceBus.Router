@@ -59,11 +59,11 @@ class Program
         routingProtocol.AddForwardRoute("SQL", "Rabbit");
         routingProtocol.AddForwardRoute("Rabbit", "SQL");
 
-        routerConfig.EnableSqlDeduplication(d =>
+        routerConfig.EnableDeduplication(d =>
         {
             d.EpochSize(1000);
             d.ConnectionFactory(() => new SqlConnection(ConnectionString));
-            d.EnsureTotalOrderOfOutgoingMessages("Rabbit", "Receiver");
+            d.AddOutgoingLink("Rabbit", "Receiver");
         });
 
         var receiverConfig = new EndpointConfiguration("Receiver");
