@@ -1,12 +1,10 @@
-﻿using System;
-
-namespace LoadTests.Sender.Router
+﻿namespace LoadTests.Sender.Router
 {
+    using System;
     using System.Data.SqlClient;
     using System.Threading.Tasks;
     using NServiceBus;
     using NServiceBus.Router;
-    using NServiceBus.Router.Deduplication;
 
     class Program
     {

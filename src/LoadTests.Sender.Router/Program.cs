@@ -6,8 +6,6 @@ namespace LoadTests.Sender.Router
     using System.Threading.Tasks;
     using NServiceBus;
     using NServiceBus.Router;
-    using NServiceBus.Router.Deduplication;
-
     class Program
     {
         static void Main(string[] args)

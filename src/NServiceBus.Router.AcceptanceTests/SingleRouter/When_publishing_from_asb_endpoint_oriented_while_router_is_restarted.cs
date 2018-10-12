@@ -12,7 +12,6 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
     using NServiceBus.AcceptanceTests;
     using NServiceBus.AcceptanceTests.EndpointTemplates;
     using NUnit.Framework;
-    using Resubscriber;
     using Serialization;
     using Settings;
     using Conventions = AcceptanceTesting.Customization.Conventions;

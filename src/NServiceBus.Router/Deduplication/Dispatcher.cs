@@ -59,6 +59,7 @@ namespace NServiceBus.Router.Deduplication
                             throttle.Release();
                         }
                     });
+                    dispatchTask.Ignore();
                 }
             });
             return Task.CompletedTask;

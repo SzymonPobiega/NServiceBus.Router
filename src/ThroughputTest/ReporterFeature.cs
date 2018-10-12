@@ -1,5 +1,4 @@
-﻿using System;
-using Metrics;
+﻿using Metrics;
 using NServiceBus.Features;
 
 public class ReporterFeature : Feature

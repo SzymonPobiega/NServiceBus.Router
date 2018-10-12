@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Metrics;
 using NServiceBus;
 using NServiceBus.Router;
-using NServiceBus.Router.Deduplication;
 using NServiceBus.Support;
 
 class Program
@@ -44,12 +43,12 @@ class Program
 
         var routerConfig = new RouterConfiguration("Router");
         routerConfig.AutoCreateQueues();
-        var sqlInterface = routerConfig.AddInterface<SqlServerTransport>("SQL", t =>
+        routerConfig.AddInterface<SqlServerTransport>("SQL", t =>
         {
             t.ConnectionString(ConnectionString);
             t.Transactions(TransportTransactionMode.SendsAtomicWithReceive);
         });
-        var rabbitInterface = routerConfig.AddInterface<RabbitMQTransport>("Rabbit", t =>
+        routerConfig.AddInterface<RabbitMQTransport>("Rabbit", t =>
         {
             t.ConnectionString("host=localhost");
             t.UseConventionalRoutingTopology();
