@@ -10,7 +10,6 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
     using System.Data.SqlClient;
     using System.Threading;
     using AcceptanceTesting.Customization;
-    using NServiceBus.Router.Deduplication;
 
     [TestFixture]
     public class When_sending_via_two_routers : NServiceBusAcceptanceTest
@@ -21,14 +20,17 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
         public async Task Should_deliver_the_reply_back()
         {
             var epochSize = 10;
-            var result = await Scenario.Define<Context>()
+            await Scenario.Define<Context>()
                 .WithRouter("Green-Blue", cfg =>
                 {
-                    cfg.EnableSqlDeduplication(c =>
+                    cfg.EnableDeduplication(c =>
                     {
                         c.ConnectionFactory(() => new SqlConnection(ConnectionString));
-                        c.EnsureTotalOrderOfOutgoingMessages("Blue", "Red-Blue");
+                        c.AddOutgoingLink("Blue", "Red-Blue");
                         c.EpochSize(epochSize);
+#pragma warning disable 618
+                        c.EnableInstaller(true);
+#pragma warning restore 618
                     });
 
                     cfg.AddInterface<SqlServerTransport>("Green", t =>
@@ -44,11 +46,14 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
                 })
                 .WithRouter("Red-Blue", cfg =>
                 {
-                    cfg.EnableSqlDeduplication(c =>
+                    cfg.EnableDeduplication(c =>
                     {
                         c.ConnectionFactory(() => new SqlConnection(ConnectionString));
-                        c.DecuplicateIncomingMessagesBasedOnTotalOrder("Blue", "Green-Blue");
+                        c.AddIncomingLink("Blue", "Green-Blue");
                         c.EpochSize(epochSize);
+#pragma warning disable 618
+                        c.EnableInstaller(true);
+#pragma warning restore 618
                     });
 
                     cfg.AddInterface<TestTransport>("Blue", t => t.BrokerBravo()).InMemorySubscriptions();
@@ -67,7 +72,7 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
                     Counter = 0
                 })))
                 .WithEndpoint<RedEndpoint>()
-                .Done(c => c.Counter > 200)
+                .Done(c => c.Counter > 10)
                 .Run(TimeSpan.FromSeconds(30));
         }
 

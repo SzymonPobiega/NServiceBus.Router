@@ -5,10 +5,12 @@ using NServiceBus.Router;
 class PublishPreroutingTerminator : ChainTerminator<PublishPreroutingContext>
 {
     string[] allInterfaces;
+    RuntimeTypeGenerator typeGenerator;
 
-    public PublishPreroutingTerminator(string[] allInterfaces)
+    public PublishPreroutingTerminator(string[] allInterfaces, RuntimeTypeGenerator typeGenerator)
     {
         this.allInterfaces = allInterfaces;
+        this.typeGenerator = typeGenerator;
     }
 
     protected override Task Terminate(PublishPreroutingContext context)
@@ -21,7 +23,7 @@ class PublishPreroutingTerminator : ChainTerminator<PublishPreroutingContext>
             {
                 var chains = interfaces.GetChainsFor(iface);
                 var chain = chains.Get<ForwardPublishContext>();
-                return chain.Invoke(new ForwardPublishContext(iface, context));
+                return chain.Invoke(new ForwardPublishContext(iface, typeGenerator.GetType(context.Types.First()), context));
             });
 
         return Task.WhenAll(forkTasks);

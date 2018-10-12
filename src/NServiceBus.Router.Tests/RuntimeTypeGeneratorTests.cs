@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using NServiceBus.Router;
+using NUnit.Framework;
 
 [TestFixture]
 public class RuntimeTypeGeneratorTests

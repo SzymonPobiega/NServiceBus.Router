@@ -40,7 +40,7 @@ namespace NServiceBus.Router
 
         Interface CreateInterface<T>(InterfaceConfiguration<T> ifaceConfig) where T : TransportDefinition, new()
         {
-            return ifaceConfig.Create(Name, "poison", autoCreateQueues, autoCreateQueuesIdentity, ImmediateRetries, DelayedRetries, CircuitBreakerThreshold);
+            return ifaceConfig.Create(Name, "poison", autoCreateQueues, autoCreateQueuesIdentity, ImmediateRetries, DelayedRetries, CircuitBreakerThreshold, typeGenerator);
         }
 
         /// <summary>
@@ -96,11 +96,23 @@ namespace NServiceBus.Router
             Modules.Add(module);
         }
 
+        /// <summary>
+        /// Defines a custom chain within the router.
+        /// </summary>
+        /// <typeparam name="TInput">Input type of the chain.</typeparam>
+        /// <param name="chainDefinition">Chain definition</param>
+        public void DefineChain<TInput>(Func<ChainBuilder, IChain<TInput>> chainDefinition) 
+            where TInput : IRuleContext
+        {
+            Chains.AddChain(chainDefinition);
+        }
+
         bool? autoCreateQueues;
         string autoCreateQueuesIdentity;
         internal List<Func<Interface>> InterfaceFactories = new List<Func<Interface>>();
         internal List<IModule> Modules = new List<IModule>();
         internal IRoutingProtocol RoutingProtocol;
         internal InterfaceChains Chains = new InterfaceChains();
+        RuntimeTypeGenerator typeGenerator = new RuntimeTypeGenerator();
     }
 }

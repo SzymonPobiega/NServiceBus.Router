@@ -1,6 +1,9 @@
-﻿enum InboxDeduplicationResult
+﻿namespace NServiceBus.Router.Deduplication
 {
-    OK,
-    Duplicate,
-    WatermarkViolation,
+    enum InboxDeduplicationResult
+    {
+        OK,
+        Duplicate,
+        WatermarkViolation,
+    }
 }

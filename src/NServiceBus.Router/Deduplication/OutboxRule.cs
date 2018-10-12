@@ -35,8 +35,12 @@
             }
 
             var transportTransaction = context.Extensions.Get<TransportTransaction>();
-            var connection = transportTransaction.Get<SqlConnection>();
-            var transaction = transportTransaction.Get<SqlTransaction>();
+
+            if (!transportTransaction.TryGet<SqlConnection>(out var connection)
+                || !transportTransaction.TryGet<SqlTransaction>(out var transaction))
+            {
+                throw new Exception("For the deduplicating link to work the incoming interface has to use SQL Server transport in native transaction mode.");
+            }
 
             await persister.Store(capturedMessages, outboxCleanerCollection.UpdateInsertedSequence, connection, transaction).ConfigureAwait(false);
 

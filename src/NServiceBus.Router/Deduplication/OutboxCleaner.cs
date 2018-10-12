@@ -5,106 +5,93 @@ using System.Threading.Tasks;
 using NServiceBus.Logging;
 using NServiceBus.Transport;
 
-class OutboxCleaner
+namespace NServiceBus.Router.Deduplication
 {
-    string sequenceKey;
-    long lastInserted;
-    long lo;
-    long hi;
-    Task closeTask;
-    OutboxPersister persister;
-    Func<SqlConnection> connectionFactory;
-    ILog logger = LogManager.GetLogger<OutboxCleaner>();
-    AsyncManualResetEvent @event = new AsyncManualResetEvent();
-
-    public OutboxCleaner(string sequenceKey, OutboxPersister persister, Func<SqlConnection> connectionFactory)
+    class OutboxCleaner
     {
-        this.sequenceKey = sequenceKey;
-        this.persister = persister;
-        this.connectionFactory = connectionFactory;
-    }
+        string sequenceKey;
+        long lastInserted;
+        long lo;
+        long hi;
+        Task closeTask;
+        OutboxPersister persister;
+        Func<SqlConnection> connectionFactory;
+        ILog logger = LogManager.GetLogger<OutboxCleaner>();
+        AsyncManualResetEvent @event = new AsyncManualResetEvent();
 
-    public void Start(CancellationToken token, Func<OutgoingMessage, Task> dispatch)
-    {
-        closeTask = Task.Run(async () =>
+        public OutboxCleaner(string sequenceKey, OutboxPersister persister, Func<SqlConnection> connectionFactory)
         {
-            while (!token.IsCancellationRequested)
+            this.sequenceKey = sequenceKey;
+            this.persister = persister;
+            this.connectionFactory = connectionFactory;
+        }
+
+        public void Start(CancellationToken token, Func<OutgoingMessage, Task> dispatch)
+        {
+            closeTask = Task.Run(async () =>
             {
-                await @event.WaitAsync().ConfigureAwait(false);
-                if (token.IsCancellationRequested)
+                while (!token.IsCancellationRequested)
                 {
-                    return;
-                }
-                try
-                {
-                    using (var conn = connectionFactory())
+                    await @event.WaitAsync().ConfigureAwait(false);
+                    if (token.IsCancellationRequested)
                     {
-                        await conn.OpenAsync().ConfigureAwait(false);
+                        return;
+                    }
+                    try
+                    {
+                        using (var conn = connectionFactory())
+                        {
+                            await conn.OpenAsync().ConfigureAwait(false);
 
-                        logger.Debug($"Attempting to close epoch for sequence {sequenceKey} based on lo={lo} and hi={hi}");
+                            logger.Debug($"Attempting to close the outbox table for sequence {sequenceKey} based on lo={lo} and hi={hi}");
 
-                        var (newLo, newHi) = await persister.TryClose(sequenceKey, lo, hi, dispatch, conn);
+                            var (newLo, newHi) = await persister.TryClose(sequenceKey, lo, hi, dispatch, conn);
 
-                        logger.Debug($"New values lo={lo} and hi={hi}");
+                            logger.Debug($"New watermark values for outbox for {sequenceKey} are lo={lo} and hi={hi}");
 
-                        @event.Reset();
-                        lo = newLo;
-                        hi = newHi;
+                            @event.Reset();
+                            lo = newLo;
+                            hi = newHi;
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        logger.Error("Unexpected error while closing the outbox table", e);
                     }
                 }
-                catch (Exception e)
-                {
-                    logger.Error("Unexpected error while closing the epoch", e);
-                }
-            }
-        });
-    }
-
-    public async Task Stop()
-    {
-        @event.Set();
-        if (closeTask == null)
-        {
-            return;
-        }
-        try
-        {
-            await closeTask.ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            //Ignore
-        }
-    }
-
-    public void UpdateInsertedSequence(long sequenceValue)
-    {
-        var updated = InterlockedExchangeIfGreaterThan(ref lastInserted, sequenceValue);
-        var localHi = Interlocked.Read(ref hi);
-        var localLo = Interlocked.Read(ref lo);
-
-        var epochSize = localHi - localLo;
-
-        if (updated < localLo + epochSize / 2 + epochSize / 4) //We have not got to the upper half of the upper epoch
-        {
-            return;
+            });
         }
 
-        @event.Set();
-    }
-
-    static long InterlockedExchangeIfGreaterThan(ref long location, long newValue)
-    {
-        long initialValue;
-        do
+        public async Task Stop()
         {
-            initialValue = Interlocked.Read(ref location);
-            if (initialValue >= newValue)
+            @event.Cancel();
+            if (closeTask == null)
             {
-                return initialValue;
+                return;
+            }
+            try
+            {
+                await closeTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                //Ignore
             }
         }
-        while (Interlocked.CompareExchange(ref location, newValue, initialValue) != initialValue);
-        return initialValue;
+
+        public void UpdateInsertedSequence(long sequenceValue)
+        {
+            var highestSeenSequenceValue = InterlocedEx.ExchangeIfGreaterThan(ref lastInserted, sequenceValue);
+            var localHi = Interlocked.Read(ref hi);
+            var localLo = Interlocked.Read(ref lo);
+
+            var epochSize = localHi - localLo;
+
+            //Triggers the closing process if the last received sequence number is in the upper quarter of the window
+            if (highestSeenSequenceValue >= localLo + epochSize / 2 + epochSize / 4)
+            {
+                @event.Set();
+            }
+        }
     }
 }

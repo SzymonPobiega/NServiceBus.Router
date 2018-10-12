@@ -4,9 +4,10 @@ using NServiceBus.Router;
 
 class UnsubscribePreroutingTerminator : ChainTerminator<UnsubscribePreroutingContext>
 {
-    public UnsubscribePreroutingTerminator(IRoutingProtocol routingProtocol)
+    public UnsubscribePreroutingTerminator(IRoutingProtocol routingProtocol, RuntimeTypeGenerator typeGenerator)
     {
         this.routingProtocol = routingProtocol;
+        this.typeGenerator = typeGenerator;
     }
     protected override Task Terminate(UnsubscribePreroutingContext context)
     {
@@ -24,11 +25,12 @@ class UnsubscribePreroutingTerminator : ChainTerminator<UnsubscribePreroutingCon
             {
                 var chains = interfaces.GetChainsFor(iface);
                 var chain = chains.Get<ForwardUnsubscribeContext>();
-                return chain.Invoke(new ForwardUnsubscribeContext(iface, routes.ToArray(), context));
+                return chain.Invoke(new ForwardUnsubscribeContext(iface, routes.ToArray(), typeGenerator.GetType(context.MessageType), context));
             });
 
         return Task.WhenAll(forkTasks);
     }
 
     IRoutingProtocol routingProtocol;
+    RuntimeTypeGenerator typeGenerator;
 }

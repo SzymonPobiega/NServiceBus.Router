@@ -1,47 +1,65 @@
-﻿using System;
-using System.Data.SqlClient;
-using System.Threading.Tasks;
-using NServiceBus.Router;
-using NServiceBus.Router.Deduplication;
+﻿using System.Threading.Tasks;
 
-class Installer : IModule
+namespace NServiceBus.Router.Deduplication
 {
-    SqlDeduplicationSettings settings;
-    OutboxPersister outboxPersister;
-    InboxPersister inboxPersister;
-    Func<SqlConnection> connectionFactory;
-
-    public Installer(SqlDeduplicationSettings settings, OutboxPersister outboxPersister, InboxPersister inboxPersister, Func<SqlConnection> connectionFactory)
+    class Installer : IModule
     {
-        this.settings = settings;
-        this.outboxPersister = outboxPersister;
-        this.inboxPersister = inboxPersister;
-        this.connectionFactory = connectionFactory;
-    }
+        DeduplicationSettings settings;
+        OutboxPersister outboxPersister;
+        InboxPersister inboxPersister;
 
-    public async Task Start(RootContext rootContext)
-    {
-        using (var conn = connectionFactory())
+        public Installer(DeduplicationSettings settings, OutboxPersister outboxPersister, InboxPersister inboxPersister)
         {
-            await conn.OpenAsync().ConfigureAwait(false);
+            this.settings = settings;
+            this.outboxPersister = outboxPersister;
+            this.inboxPersister = inboxPersister;
+        }
 
-            using (var trans = conn.BeginTransaction())
+        public async Task Start(RootContext rootContext)
+        {
+            if (settings.Uninstall)
             {
-                foreach (var destination in settings.GetAllDestinations())
+                using (var conn = settings.ConnFactory())
                 {
-                    await outboxPersister.Install(destination, conn, trans).ConfigureAwait(false);
+                    await conn.OpenAsync().ConfigureAwait(false);
+
+                    using (var trans = conn.BeginTransaction())
+                    {
+                        foreach (var destination in settings.GetAllDestinations())
+                        {
+                            await outboxPersister.Uninstall(destination, conn, trans).ConfigureAwait(false);
+                        }
+                        foreach (var source in settings.GetAllSources())
+                        {
+                            await inboxPersister.Uninstall(source, conn, trans).ConfigureAwait(false);
+                        }
+                        trans.Commit();
+                    }
                 }
-                foreach (var source in settings.GetAllSources())
+            }
+
+            using (var conn = settings.ConnFactory())
+            {
+                await conn.OpenAsync().ConfigureAwait(false);
+
+                using (var trans = conn.BeginTransaction())
                 {
-                    await inboxPersister.Install(source, conn, trans).ConfigureAwait(false);
+                    foreach (var destination in settings.GetAllDestinations())
+                    {
+                        await outboxPersister.Install(destination, conn, trans).ConfigureAwait(false);
+                    }
+                    foreach (var source in settings.GetAllSources())
+                    {
+                        await inboxPersister.Install(source, conn, trans).ConfigureAwait(false);
+                    }
+                    trans.Commit();
                 }
-                trans.Commit();
             }
         }
-    }
 
-    public Task Stop()
-    {
-        return Task.CompletedTask;
+        public Task Stop()
+        {
+            return Task.CompletedTask;
+        }
     }
 }

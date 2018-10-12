@@ -1,5 +1,6 @@
 ﻿namespace NServiceBus.Router
 {
+    using System;
     using System.Threading.Tasks;
 
     /// <summary>
@@ -10,19 +11,25 @@
         /// <summary>
         /// Creates new instance.
         /// </summary>
-        public ForwardPublishContext(string outgoingInterface, PublishPreroutingContext parentContext)
+        public ForwardPublishContext(string outgoingInterface, Type rootType, PublishPreroutingContext parentContext)
             : base(outgoingInterface, parentContext)
         {
             ReceivedHeaders = parentContext.Headers;
             ReceivedBody = parentContext.Body;
             MessageId = parentContext.MessageId;
             Types = parentContext.Types;
+            RootEventType = rootType;
         }
 
         /// <summary>
         /// Event types associated with the message being forwarded.
         /// </summary>
         public string[] Types { get; }
+
+        /// <summary>
+        /// Root event type.
+        /// </summary>
+        public Type RootEventType { get; }
 
         /// <summary>
         /// The headers associated with the received message.
