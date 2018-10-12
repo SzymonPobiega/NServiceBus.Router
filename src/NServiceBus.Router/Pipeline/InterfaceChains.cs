@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using NServiceBus.Raw;
 using NServiceBus.Router;
 
 class InterfaceChains : IInterfaceChains
@@ -8,7 +9,7 @@ class InterfaceChains : IInterfaceChains
     Dictionary<string, IChains> interfaceMap = new Dictionary<string, IChains>();
     List<RuleRegistration> rules = new List<RuleRegistration>();
 
-    public IChain<RawContext> RegisterInterface(IRuleCreationContext context, string interfaceName)
+    public IChain<RawContext> RegisterInterface(IRuleCreationContext context, string interfaceName, IRawEndpoint rawEndpoint)
     {
         var applicableRules = rules.Where(r => r.Condition(context))
             .ToDictionary(r => r.Type, r => r.Constructor);

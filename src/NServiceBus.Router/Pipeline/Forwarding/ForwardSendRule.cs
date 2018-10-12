@@ -16,42 +16,38 @@ class ForwardSendRule : IRule<ForwardSendContext, ForwardSendContext>
 
     public async Task Invoke(ForwardSendContext context, Func<ForwardSendContext, Task> next)
     {
-        AnycastContext Forward(Route r)
-        {
-            return r.Gateway != null
-                ? CreateForkContext(context, r.Gateway, r.Destination)
-                : CreateForkContext(context, r.Destination, null);
-        }
-
-        var forkContexts = context.Routes.Select(Forward).ToArray();
+        var forkContexts = context.Routes.Where(r => r.Gateway == null).Select(r => CreateForkContext(context, r.Destination)).ToArray();
         var chain = context.Chains.Get<AnycastContext>();
         var forkTasks = forkContexts.Select(c => chain.Invoke(c));
         await Task.WhenAll(forkTasks).ConfigureAwait(false);
         await next(context).ConfigureAwait(false);
     }
 
-    AnycastContext CreateForkContext(ForwardSendContext context, string destinationEndpoint, string ultimateDestination)
+    AnycastContext CreateForkContext(ForwardSendContext context, string destinationEndpoint)
     {
         var forwardedHeaders = context.ReceivedHeaders.Copy();
 
-        if (context.ReceivedHeaders.TryGetValue(Headers.ReplyToAddress, out var replyToHeader)
-            && context.ReceivedHeaders.TryGetValue(Headers.CorrelationId, out var correlationId))
-        {
-            // pipe-separated TLV format
-            var newCorrelationId = TLV
-                .Encode("id", correlationId)
-                .AppendTLV("reply-to", replyToHeader)
-                .AppendTLV("iface", context.IncomingInterface);
+        var newCorrelationId = TLV
+            .Encode("iface", context.IncomingInterface);
 
-            forwardedHeaders[Headers.CorrelationId] = newCorrelationId;
+        if (context.ReceivedHeaders.TryGetValue(RouterHeaders.ReplyToRouter, out var replyToRouter))
+        {
+            newCorrelationId = newCorrelationId.AppendTLV("reply-to-router", replyToRouter);
         }
+
+        if (context.ReceivedHeaders.TryGetValue(Headers.ReplyToAddress, out var replyToHeader))
+        {
+            newCorrelationId = newCorrelationId.AppendTLV("reply-to", replyToHeader);
+        }
+
+        if (context.ReceivedHeaders.TryGetValue(Headers.CorrelationId, out var correlationId))
+        {
+            newCorrelationId = newCorrelationId.AppendTLV("id", correlationId);
+        }
+
+        forwardedHeaders[Headers.CorrelationId] = newCorrelationId;
         forwardedHeaders[Headers.ReplyToAddress] = localAddress;
-
-        if (ultimateDestination != null)
-        {
-            forwardedHeaders["NServiceBus.Bridge.DestinationEndpoint"] = ultimateDestination;
-        }
-
+        
         var message = new OutgoingMessage(context.MessageId, forwardedHeaders, context.ReceivedBody);
         return new AnycastContext(destinationEndpoint, message, DistributionStrategyScope.Send, context);
     }

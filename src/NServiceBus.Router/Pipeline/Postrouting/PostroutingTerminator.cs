@@ -16,18 +16,14 @@ class PostroutingTerminator : ChainTerminator<PostroutingContext>
 
     protected override Task Terminate(PostroutingContext context)
     {
-        foreach (var operation in context.Messages.UnicastTransportOperations)
+        foreach (var operation in context.Messages)
         {
             AddTrace(operation);
         }
-        foreach (var operation in context.Messages.MulticastTransportOperations)
-        {
-            AddTrace(operation);
-        }
-        return dispatcher.Dispatch(context.Messages, context.Get<TransportTransaction>(), context);
+        return dispatcher.Dispatch(new TransportOperations(context.Messages), context.Get<TransportTransaction>(), context);
     }
 
-    void AddTrace(IOutgoingTransportOperation op)
+    void AddTrace(TransportOperation op)
     {
         if (op.Message.Headers.TryGetValue("NServiceBus.Bridge.Trace", out var trace))
         {

@@ -54,6 +54,7 @@ namespace NServiceBus.Router
             chains.AddRule(c => new StorageDrivenSubscriptionRule(c.SubscriptionPersistence), c => !c.HasNativePubSub());
 
             chains.AddRule(c => new ForwardSendRule(c.Endpoint.TransportAddress));
+            chains.AddRule(c => new ForwardSendGatewayRule(c.Endpoint.EndpointName));
             chains.AddRule(_ => new ForwardReplyRule());
             chains.AddRule(c => new ForwardSubscribeGatewayRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName));
             chains.AddRule(c => new ForwardUnsubscribeGatewayRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName));
@@ -68,7 +69,7 @@ namespace NServiceBus.Router
             chains.AddRule(_ => new ForwardPublishTerminator());
             chains.AddRule(_ => new ForwardReplyTerminator());
 
-            return new RouterImpl(config.Name, interfaces, config.RoutingProtocol, chains);
+            return new RouterImpl(config.Name, interfaces, config.Modules.ToArray(), config.RoutingProtocol, chains);
         }
     }
 }

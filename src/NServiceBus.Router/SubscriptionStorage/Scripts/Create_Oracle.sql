@@ -11,7 +11,7 @@ begin
        'create table "' || tableName || '"
         (
           messagetype nvarchar2(200) not null,
-          subscriber nvarchar2(200) not null,
+          subscriber nvarchar2(200),
           endpoint varchar2(200),
           persistenceversion varchar2(23),
           constraint "' || tableName || '_PK" primary key

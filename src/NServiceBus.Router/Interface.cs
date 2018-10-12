@@ -11,7 +11,7 @@ using NServiceBus.Transport;
 interface Interface
 {
     string Name { get; }
-    Task Initialize(InterfaceChains interfaces);
+    Task Initialize(InterfaceChains interfaces, RootContext rootContext);
     Task StartReceiving();
     Task StopReceiving();
     Task Stop();
@@ -45,12 +45,12 @@ class Interface<T> : Interface where T : TransportDefinition, new()
         settings.Set("RabbitMQ.RoutingTopologySupportsDelayedDelivery", true);
     }
 
-    public async Task Initialize(InterfaceChains interfaces)
+    public async Task Initialize(InterfaceChains interfaces, RootContext rootContext)
     {
-        rootContext = new RootContext(interfaces);
+        this.rootContext = rootContext;
         sender = await rawConfig.Create().ConfigureAwait(false);
         var ruleCreationContext = ruleCreationContextFactory(sender);
-        preroutingChain = interfaces.RegisterInterface(ruleCreationContext, Name);
+        preroutingChain = interfaces.RegisterInterface(ruleCreationContext, Name, sender);
     }
 
     public async Task StartReceiving()

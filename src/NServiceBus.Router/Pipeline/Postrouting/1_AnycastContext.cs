@@ -27,7 +27,7 @@
         /// <summary>
         /// Creates new instance.
         /// </summary>
-        public AnycastContext(string destinationEndpoint, OutgoingMessage message, DistributionStrategyScope distributionScope, BaseForwardRuleContext parentContext) : base(parentContext)
+        public AnycastContext(string destinationEndpoint, OutgoingMessage message, DistributionStrategyScope distributionScope, RuleContext parentContext) : base(parentContext)
         {
             DestinationEndpoint = destinationEndpoint;
             Message = message;

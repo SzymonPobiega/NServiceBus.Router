@@ -1,0 +1,5 @@
+﻿enum WatermarkCheckViolationResult
+{
+    Duplicate,
+    Retry
+}

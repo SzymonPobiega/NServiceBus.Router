@@ -17,20 +17,16 @@ class PreroutingToSubscribePreroutingFork : IRule<PreroutingContext, PreroutingC
                 throw new UnforwardableMessageException("The subscription message type header is missing.");
             }
 
-            string subscriberEndpoint = null;
-
-            if (context.Headers.TryGetValue(Headers.SubscriberTransportAddress, out var subscriberAddress))
-            {
-                subscriberEndpoint = context.Headers[Headers.SubscriberEndpoint];
-            }
-            else
+            if (!context.Headers.TryGetValue(Headers.SubscriberTransportAddress, out var subscriberAddress))
             {
                 subscriberAddress = GetReplyToAddress(context);
             }
 
-            if (subscriberAddress == null)
+            context.Headers.TryGetValue(Headers.SubscriberEndpoint, out var subscriberEndpoint);
+
+            if (subscriberEndpoint == null && subscriberAddress == null)
             {
-                throw new UnforwardableMessageException("Subscription message arrived without a valid ReplyToAddress.");
+                throw new UnforwardableMessageException("Either subscriber address or subscriber endpoint (or both) are required in a subscription message.");
             }
 
             if (context.Intent == MessageIntentEnum.Subscribe)

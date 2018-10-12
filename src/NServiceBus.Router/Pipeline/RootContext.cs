@@ -1,12 +1,26 @@
 ﻿using NServiceBus.Extensibility;
-using NServiceBus.Router; 
 
-class RootContext : ContextBag, IRuleContext
+namespace NServiceBus.Router
 {
-    public RootContext(IInterfaceChains interfaces)
+    /// <summary>
+    /// Root context for the router.
+    /// </summary>
+    public class RootContext : ContextBag, IRuleContext
     {
-        Set(interfaces);
-    }
+        internal RootContext(IInterfaceChains interfaces)
+        {
+            Set(interfaces);
+        }
 
-    public ContextBag Extensions => this;
+        /// <summary>
+        /// Router's interfaces.
+        /// </summary>
+        public IInterfaceChains Interfaces => Get<IInterfaceChains>();
+
+        /// <summary>
+        /// Allows extending the rule context by adding arbitrary values.
+        /// </summary>
+        public ContextBag Extensions => this;
+    }
 }
+

@@ -65,7 +65,7 @@
 
         internal Interface Create(string endpointName, string poisonQueue, bool? hubAutoCreateQueues, string hubAutoCreateQueuesIdentity, int immediateRetries, int delayedRetries, int circuitBreakerThreshold)
         {
-            IRuleCreationContext ContextFactory(IRawEndpoint e) => new RuleCreationContext(EndpointInstances, subscriptionStorage, DistributionPolicy, e);
+            IRuleCreationContext ContextFactory(IRawEndpoint e) => new RuleCreationContext(Name, EndpointInstances, subscriptionStorage, DistributionPolicy, e);
             return new Interface<T>(endpointName, Name, customization, ContextFactory, poisonQueue, maximumConcurrency, autoCreateQueues ?? hubAutoCreateQueues ?? false, autoCreateQueuesIdentity ?? hubAutoCreateQueuesIdentity, immediateRetries, delayedRetries, circuitBreakerThreshold);
         }
     }
