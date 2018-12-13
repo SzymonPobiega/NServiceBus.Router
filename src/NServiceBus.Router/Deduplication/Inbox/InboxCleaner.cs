@@ -1,14 +1,15 @@
-﻿using System;
-using System.Data.SqlClient;
-using System.Threading;
-using System.Threading.Tasks;
-using NServiceBus.Logging;
-
-namespace NServiceBus.Router.Deduplication
+﻿namespace NServiceBus.Router.Deduplication.Inbox
 {
+    using System;
+    using System.Data.SqlClient;
+    using System.Threading;
+    using System.Threading.Tasks;
+    using Logging;
+
     class InboxCleaner
     {
-        string sourceSequenceKey;
+        string sourceKey;
+        volatile LinkState linkState;
         long lastReceived;
         long cachedLo;
         long cachedHi;
@@ -21,7 +22,7 @@ namespace NServiceBus.Router.Deduplication
 
         public InboxCleaner(string sourceSequenceKey, InboxPersister persistence, Func<SqlConnection> connectionFactory)
         {
-            this.sourceSequenceKey = sourceSequenceKey;
+            this.sourceKey = sourceSequenceKey;
             this.persistence = persistence;
             this.connectionFactory = connectionFactory;
         }
@@ -43,20 +44,18 @@ namespace NServiceBus.Router.Deduplication
                         {
                             await conn.OpenAsync().ConfigureAwait(false);
 
-                            logger.Debug($"Attempting to close the inbox table for sequence {sourceSequenceKey} based on lo={cachedLo} and hi={cachedHi}");
+                            logger.Debug($"Attempting advance epoch for source {sourceKey} based on link state {linkState}");
 
-                            var (newLo, newHi) = await persistence.TryClose(sourceSequenceKey, cachedLo, cachedHi, conn);
-
-                            logger.Debug($"New watermark values for inbox for {sourceSequenceKey} lo={cachedLo} and hi={cachedHi}");
+                            var newState = await persistence.Advance(sourceKey, linkState, conn);
 
                             @event.Reset();
-                            cachedLo = newLo;
-                            cachedHi = newHi;
+
+                            linkState = newState;
                         }
                     }
                     catch (Exception e)
                     {
-                        logger.Error("Unexpected error while closing the inbox table", e);
+                        logger.Error("Unexpected error while trying to advance epoch", e);
                     }
                     finally
                     {
@@ -80,17 +79,9 @@ namespace NServiceBus.Router.Deduplication
             }
         }
 
-        public (Task cleanBarrier, WatermarkCheckViolationResult checkResult) CheckConstraintFailedFor(long sequenceValue, Task currentCleanBarrier)
+        public void TriggerAdvance()
         {
-            var localLo = Interlocked.Read(ref cachedLo);
-            if (sequenceValue < localLo)
-            {
-                return (currentCleanBarrier, WatermarkCheckViolationResult.Duplicate);
-            }
-            //Seems like our watermarks values are stale or the message sequence number does not fit. Trigger closing.
             @event.Set();
-
-            return (cleanRunAwaitable.Task, WatermarkCheckViolationResult.Retry);
         }
 
         public void UpdateReceivedSequence(long sequenceValue)
@@ -105,6 +96,11 @@ namespace NServiceBus.Router.Deduplication
             {
                 @event.Set();
             }
+        }
+
+        public LinkState GetLinkState()
+        {
+            return linkState;
         }
     }
 }

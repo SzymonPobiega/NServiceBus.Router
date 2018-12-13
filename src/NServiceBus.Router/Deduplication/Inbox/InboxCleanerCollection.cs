@@ -1,10 +1,10 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace NServiceBus.Router.Deduplication
+﻿namespace NServiceBus.Router.Deduplication.Inbox
 {
+    using System.Collections.Generic;
+    using System.Linq;
+    using System.Threading;
+    using System.Threading.Tasks;
+
     class InboxCleanerCollection : IModule
     {
         Dictionary<string, InboxCleaner> sequences;
@@ -18,6 +18,11 @@ namespace NServiceBus.Router.Deduplication
         public void UpdateReceivedSequence(string sequenceKey, long sequenceValue)
         {
             sequences[sequenceKey].UpdateReceivedSequence(sequenceValue);
+        }
+
+        public LinkState GetLinkState(string sequenceKey)
+        {
+            return sequences[sequenceKey].GetLinkState();
         }
 
         public (Task cleanBarrier, WatermarkCheckViolationResult checkResult) CheckAgainsWatermarks(string sequenceKey, long sequenceValue, Task currentCleanBarrier)

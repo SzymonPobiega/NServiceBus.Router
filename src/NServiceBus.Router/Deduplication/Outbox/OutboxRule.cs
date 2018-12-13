@@ -42,7 +42,7 @@
                 throw new Exception("For the deduplicating link to work the incoming interface has to use SQL Server transport in native transaction mode.");
             }
 
-            await persister.Store(capturedMessages, outboxCleanerCollection.UpdateInsertedSequence, connection, transaction).ConfigureAwait(false);
+            await persister.Store(capturedMessages, outboxCleanerCollection.ValidateSequence, connection, transaction).ConfigureAwait(false);
 
             foreach (var operation in capturedMessages)
             {

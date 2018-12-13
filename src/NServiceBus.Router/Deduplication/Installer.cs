@@ -2,6 +2,8 @@
 
 namespace NServiceBus.Router.Deduplication
 {
+    using Inbox;
+
     class Installer : IModule
     {
         DeduplicationSettings settings;

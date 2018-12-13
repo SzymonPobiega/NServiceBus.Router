@@ -90,13 +90,12 @@ namespace NServiceBus.Router.Deduplication
                 using (var trans = conn.BeginTransaction())
                 {
                     //Will block until the record insert transaction is completed.
-                    await persister.MarkDispatched(operation, conn, trans).ConfigureAwait(false);
+                    await OutboxPersister.MarkAsDispatched(operation, conn, trans).ConfigureAwait(false);
 
                     var iface = settings.GetDestinationInterface(operation.Destination);
 
                     var chains = rootContext.Interfaces.GetChainsFor(iface);
                     var chain = chains.Get<AnycastContext>();
-
                     var dispatchContext = new OutboxDispatchContext(rootContext, iface);
                     var forwardContext = new AnycastContext(operation.Destination, operation.OutgoingMessage, DistributionStrategyScope.Send, dispatchContext);
                     dispatchContext.Set(new TransportTransaction());

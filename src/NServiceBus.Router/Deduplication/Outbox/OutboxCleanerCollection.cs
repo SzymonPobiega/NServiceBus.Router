@@ -18,9 +18,14 @@ namespace NServiceBus.Router.Deduplication
             destinationToInterfaceMap = settings.GetAllDestinations().ToDictionary(d => d, d => settings.GetDestinationInterface(d));
         }
 
-        public void UpdateInsertedSequence(string sequenceKey, long sequenceValue)
+        public void ValidateSequence(CapturedTransportOperation operation)
         {
-            sequences[sequenceKey].UpdateInsertedSequence(sequenceValue);
+            sequences[operation.Destination].ValidateSequence(operation);
+        }
+
+        public LinkState GetLinkState(string destinationKey)
+        {
+            return sequences[destinationKey].GetLinkState();
         }
 
         public Task Start(RootContext rootContext)
@@ -33,9 +38,9 @@ namespace NServiceBus.Router.Deduplication
                 {
                     var destinationEndpoint = sequence.Key;
                     var iface = destinationToInterfaceMap[destinationEndpoint];
+
                     var chains = rootContext.Interfaces.GetChainsFor(iface);
                     var chain = chains.Get<AnycastContext>();
-
                     var dispatchContext = new OutboxDispatchContext(rootContext, iface);
                     var forwardContext = new AnycastContext(destinationEndpoint, operation, DistributionStrategyScope.Send, dispatchContext);
                     dispatchContext.Set(new TransportTransaction());
