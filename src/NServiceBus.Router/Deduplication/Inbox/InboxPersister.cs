@@ -8,7 +8,7 @@
     {
         static ILog log = LogManager.GetLogger<InboxPersister>();
         readonly string sourceKey;
-        string destinationSequenceKey;
+        string destinationKey;
         LinkStateTable linkStateTable;
         volatile LinkState linkState;
 
@@ -16,7 +16,7 @@
         {
             linkStateTable = new LinkStateTable(destinationKey);
             this.sourceKey = sourceKey;
-            destinationSequenceKey = destinationKey;
+            this.destinationKey = destinationKey;
         }
 
         public async Task<DeduplicationResult> Deduplicate(string messageId, long seq, SqlConnection conn, SqlTransaction trans)
@@ -96,13 +96,12 @@
                 return; //We ignore duplicate initialize messages.
             }
 
-            var firstTable = $"Inbox_{sourceKey}_{destinationSequenceKey}_1";
-            var secondTable = $"Inbox_{sourceKey}_{destinationSequenceKey}_2";
-
             LinkState initialized;
             using (var initTransaction = conn.BeginTransaction())
             {
-                initialized = linkState.Initialize(firstTable, headLo, headHi, secondTable, tailLo, tailHi);
+                initialized = linkState.Initialize(
+                    InboxTable.Left(sourceKey, destinationKey), headLo, headHi, 
+                    InboxTable.Right(sourceKey, destinationKey), tailLo, tailHi);
 
                 await initialized.HeadSession.CreateConstraint(conn, initTransaction).ConfigureAwait(false);
                 await initialized.TailSession.CreateConstraint(conn, initTransaction).ConfigureAwait(false);

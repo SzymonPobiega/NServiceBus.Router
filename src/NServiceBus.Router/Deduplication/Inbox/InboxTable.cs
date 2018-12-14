@@ -6,6 +6,9 @@
 
     class InboxTable
     {
+        public static string Left(string sourceKey, string destinationKey) => $"Inbox_{sourceKey}_{destinationKey}_Left";
+        public static string Right(string sourceKey, string destinationKey) => $"Inbox_{sourceKey}_{destinationKey}_Right";
+
         static ILog log = LogManager.GetLogger<InboxTable>();
         string name;
 
