@@ -1,13 +1,13 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Data.SqlClient;
-using System.Threading;
-using System.Threading.Tasks;
-using NServiceBus.Logging;
-using NServiceBus.Transport;
-
-namespace NServiceBus.Router.Deduplication
+﻿namespace NServiceBus.Router.Deduplication.Outbox
 {
+    using System;
+    using System.Collections.Concurrent;
+    using System.Data.SqlClient;
+    using System.Threading;
+    using System.Threading.Tasks;
+    using Logging;
+    using Transport;
+
     class Dispatcher : IModule
     {
         DeduplicationSettings settings;

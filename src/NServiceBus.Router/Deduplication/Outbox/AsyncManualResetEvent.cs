@@ -1,8 +1,8 @@
-﻿using System.Threading;
-using System.Threading.Tasks;
-
-namespace NServiceBus.Router.Deduplication
+﻿namespace NServiceBus.Router.Deduplication.Outbox
 {
+    using System.Threading;
+    using System.Threading.Tasks;
+
     class AsyncManualResetEvent
     {
         volatile TaskCompletionSource<bool> completionSource = new TaskCompletionSource<bool>();

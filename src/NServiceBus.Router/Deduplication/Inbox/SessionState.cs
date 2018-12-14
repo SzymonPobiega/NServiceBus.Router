@@ -2,6 +2,7 @@
 {
     using System.Data.SqlClient;
     using System.Threading.Tasks;
+    using Outbox;
 
     class SessionState
     {

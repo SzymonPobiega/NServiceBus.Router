@@ -1,8 +1,8 @@
-﻿using System.Threading.Tasks;
-
-namespace NServiceBus.Router.Deduplication
+﻿namespace NServiceBus.Router.Deduplication
 {
+    using System.Threading.Tasks;
     using Inbox;
+    using Outbox;
 
     class Installer : IModule
     {

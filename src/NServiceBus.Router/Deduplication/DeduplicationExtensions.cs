@@ -3,6 +3,7 @@
     using System;
     using Deduplication;
     using Deduplication.Inbox;
+    using Deduplication.Outbox;
 
     /// <summary>
     /// Configures message deduplication based on sequence numbers.

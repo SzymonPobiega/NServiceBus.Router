@@ -1,4 +1,4 @@
-﻿namespace NServiceBus.Router.Deduplication
+﻿namespace NServiceBus.Router.Deduplication.Outbox
 {
     using System.Collections.Generic;
     using System.Data.SqlClient;

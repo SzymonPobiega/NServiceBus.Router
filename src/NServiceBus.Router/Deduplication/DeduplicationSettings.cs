@@ -1,4 +1,4 @@
-﻿namespace NServiceBus.Router.Deduplication
+﻿namespace NServiceBus.Router
 {
     using System;
     using System.Collections.Generic;

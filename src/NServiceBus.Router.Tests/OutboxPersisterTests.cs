@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using NServiceBus.Logging;
 using NServiceBus.Router;
-using NServiceBus.Router.Deduplication;
+using NServiceBus.Router.Deduplication.Outbox;
 using NServiceBus.Transport;
 using NUnit.Framework;
 

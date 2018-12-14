@@ -1,4 +1,4 @@
-﻿using NServiceBus.Router.Deduplication;
+﻿using NServiceBus.Router.Deduplication.Outbox;
 using NUnit.Framework;
 
 [TestFixture]
