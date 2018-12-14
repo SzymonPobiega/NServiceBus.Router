@@ -13,12 +13,14 @@
             var epoch = reader.GetInt64(0);
             var headLo = reader.GetInt64(1);
             var headHi = reader.GetInt64(2);
-            var headTable = reader.GetString(3);
+            var headTable = reader.IsDBNull(3) ? null : reader.GetString(3);
             var tailLo = reader.GetInt64(4);
             var tailHi = reader.GetInt64(5);
-            var tailTable = reader.GetString(6);
+            var tailTable = reader.IsDBNull(6) ? null : reader.GetString(6);
 
-            return new LinkState(epoch, new SessionState(headLo, headHi, headTable), new SessionState(tailLo, tailHi, tailTable));
+            var headSession = headTable == null ? null : new SessionState(headLo, headHi, headTable);
+            var tailSession = tailTable == null ? null : new SessionState(tailLo, tailHi, tailTable);
+            return new LinkState(epoch, headSession, tailSession);
         }
 
         LinkState(long epoch, SessionState headSession, SessionState tailSession)
@@ -44,9 +46,19 @@
             }
             if (TailSession.Matches(sequence))
             {
-                return HeadSession.Table;
+                return TailSession.Table;
             }
             throw new Exception($"Provided sequence {sequence} does not match the current epoch [{HeadSession.Lo},{HeadSession.Hi}),[{TailSession.Lo},{TailSession.Hi})");
+        }
+
+        public bool IsFromNextEpoch(long seq)
+        {
+            return seq >= HeadSession.Hi;
+        }
+
+        public bool IsDuplicate(long seq)
+        {
+            return seq < TailSession.Lo;
         }
 
         public static LinkState Uninitialized()

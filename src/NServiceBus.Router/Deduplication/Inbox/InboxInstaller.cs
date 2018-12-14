@@ -34,8 +34,8 @@
             var linkStateTable = new LinkStateTable(destinationKey);
             await linkStateTable.Drop(conn, trans).ConfigureAwait(false);
 
-            await new InboxTable(lo).Create(conn, trans).ConfigureAwait(false);
-            await new InboxTable(hi).Create(conn, trans).ConfigureAwait(false);
+            await new InboxTable(lo).Drop(conn, trans).ConfigureAwait(false);
+            await new InboxTable(hi).Drop(conn, trans).ConfigureAwait(false);
         }
     }
 }

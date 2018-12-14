@@ -10,6 +10,9 @@
 
     class OutboxTable
     {
+        public static string Left(string sourceKey, string destinationKey) => $"Outbox_{sourceKey}_{destinationKey}_Left";
+        public static string Right(string sourceKey, string destinationKey) => $"Outbox_{sourceKey}_{destinationKey}_Right";
+
         static ILog log = LogManager.GetLogger<OutboxTable>();
         public string Name { get; }
 

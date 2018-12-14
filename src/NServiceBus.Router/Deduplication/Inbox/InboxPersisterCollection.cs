@@ -27,7 +27,7 @@
             return persisters[sourceKey].Deduplicate(messageId, seq, conn, trans);
         }
 
-        public Task Advance(string sourceKey, int nextEpoch, long nextLo, long nextHi, SqlConnection conn)
+        public Task Advance(string sourceKey, long nextEpoch, long nextLo, long nextHi, SqlConnection conn)
         {
             return persisters[sourceKey].Advance(nextEpoch, nextLo, nextHi, conn);
         }

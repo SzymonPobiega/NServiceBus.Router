@@ -23,6 +23,27 @@
         {
             var cachedLinkState = linkState;
 
+            if (cachedLinkState.IsDuplicate(seq))
+            {
+                return DeduplicationResult.Duplicate;
+            }
+
+            if (cachedLinkState.IsFromNextEpoch(seq))
+            {
+                var freshLinkState = await linkStateTable.Get(sourceKey, conn).ConfigureAwait(false);
+                UpdateCachedLinkState(freshLinkState);
+                cachedLinkState = linkState;
+            }
+
+            if (cachedLinkState.IsFromNextEpoch(seq))
+            {
+                throw new ProcessCurrentMessageLaterException("The message requires advancing epoch. Moving it to the back of the queue.");
+            }
+            if (cachedLinkState.IsDuplicate(seq))
+            {
+                return DeduplicationResult.Duplicate;
+            }
+
             var tableName = cachedLinkState.GetTableName(seq);
             var table = new InboxTable(tableName);
             try
@@ -32,24 +53,18 @@
             }
             catch (SqlException e)
             {
-                if (e.Number == 547)
+                if (e.Number == 547) //Constraint violation
                 {
-                    if (seq < cachedLinkState.TailSession.Lo)
-                    {
-                        return DeduplicationResult.Duplicate;
-                    }
-
                     var freshLinkState = await linkStateTable.Get(sourceKey, conn).ConfigureAwait(false);
-                    if (seq < freshLinkState.TailSession.Lo)
+                    UpdateCachedLinkState(freshLinkState);
+                    if (freshLinkState.IsDuplicate(seq))
                     {
                         return DeduplicationResult.Duplicate;
                     }
-
-                    UpdateCachedLinkState(freshLinkState);
                     throw new ProcessCurrentMessageLaterException("Link state is stale. Processing current message later.");
                 }
 
-                if (e.Number == 2627)
+                if (e.Number == 2627) //Unique index violation
                 {
                     return DeduplicationResult.Duplicate;
                 }
@@ -71,7 +86,7 @@
 
         public async Task Prepare(SqlConnection conn)
         {
-            linkState = await linkStateTable.Get(sourceKey, conn);
+            linkState = await linkStateTable.Get(sourceKey, conn).ConfigureAwait(false);
         }
 
         public async Task Initialize(long headLo, long headHi, long tailLo, long tailHi, SqlConnection conn)
@@ -84,14 +99,22 @@
             var firstTable = $"Inbox_{sourceKey}_{destinationSequenceKey}_1";
             var secondTable = $"Inbox_{sourceKey}_{destinationSequenceKey}_2";
 
-            var initialized = linkState.Initialize(firstTable, headLo, headHi, secondTable, tailLo, tailHi);
+            LinkState initialized;
+            using (var initTransaction = conn.BeginTransaction())
+            {
+                initialized = linkState.Initialize(firstTable, headLo, headHi, secondTable, tailLo, tailHi);
 
-            await linkStateTable.Update(sourceKey, initialized, conn, null).ConfigureAwait(false);
+                await initialized.HeadSession.CreateConstraint(conn, initTransaction).ConfigureAwait(false);
+                await initialized.TailSession.CreateConstraint(conn, initTransaction).ConfigureAwait(false);
+
+                await linkStateTable.Update(sourceKey, initialized, conn, initTransaction).ConfigureAwait(false);
+                initTransaction.Commit();
+            }
 
             UpdateCachedLinkState(initialized);
         }
 
-        public async Task Advance(int nextEpoch, long nextLo, long nextHi, SqlConnection conn)
+        public async Task<LinkState> Advance(long nextEpoch, long nextLo, long nextHi, SqlConnection conn)
         {
             //Let's actually check if our values are correct.
             var queriedLinkState = await linkStateTable.Get(sourceKey, conn);
@@ -120,20 +143,26 @@
                     throw new ProcessCurrentMessageLaterException($"Link state for {sourceKey} does not match previously read value. Cannot advance the epoch.");
                 }
 
-                if (nextEpoch != lockedLinkState.Epoch + 1)
+                if (nextEpoch < lockedLinkState.Epoch + 1)
                 {
-                    throw new ProcessCurrentMessageLaterException($"The link state is at epoch {lockedLinkState.Epoch} and is not ready to transition to epoch {nextEpoch}");
+                    //This is an old message that we already processed.
+                    return lockedLinkState;
+                }
+
+                if (nextEpoch > lockedLinkState.Epoch + 1)
+                {
+                    throw new ProcessCurrentMessageLaterException($"The link state is at epoch {lockedLinkState.Epoch} and is not ready to transition to epoch {nextEpoch}.");
                 }
 
                 newLinkState = lockedLinkState.Advance(nextLo, nextHi);
 
-                await table.CreateConstraint(newLinkState.HeadSession.Lo, newLinkState.HeadSession.Hi, conn, closeTransaction);
+                await newLinkState.HeadSession.CreateConstraint(conn, closeTransaction);
 
                 //Here we have all holes plugged and no possibility of inserting new rows. We can truncate
                 log.Debug($"Truncating table {tableName}.");
                 await table.Truncate(conn, closeTransaction).ConfigureAwait(false);
 
-                await table.DropConstraint(lockedLinkState.HeadSession.Lo, lockedLinkState.HeadSession.Hi, conn, closeTransaction).ConfigureAwait(false);
+                await lockedLinkState.TailSession.DropConstraint(conn, closeTransaction).ConfigureAwait(false);
 
                 log.Debug($"Updating link state for {sourceKey} to {newLinkState}.");
 
@@ -143,6 +172,7 @@
 
             }
             UpdateCachedLinkState(newLinkState);
+            return newLinkState;
         }
     }
 }

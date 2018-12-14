@@ -26,5 +26,11 @@
             var table = new OutboxTable(Table);
             return table.CreateConstraint(Lo, Hi, conn, trans);
         }
+
+        public Task DropConstraint(SqlConnection conn, SqlTransaction trans)
+        {
+            var table = new OutboxTable(Table);
+            return table.DropConstraint(Lo, Hi, conn, trans);
+        }
     }
 }

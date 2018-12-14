@@ -21,12 +21,14 @@
             var announced = reader.GetBoolean(1);
             var headLo = reader.GetInt64(2);
             var headHi = reader.GetInt64(3);
-            var headTable = reader.GetString(4);
+            var headTable = reader.IsDBNull(4) ? null : reader.GetString(4);
             var tailLo = reader.GetInt64(5);
             var tailHi = reader.GetInt64(6);
-            var tailTable = reader.GetString(7);
+            var tailTable = reader.IsDBNull(7) ? null : reader.GetString(7);
 
-            return new LinkState(epoch, announced, new SessionState(headLo, headHi, headTable), new SessionState(tailLo, tailHi, tailTable));
+            var headSession = headTable == null ? null : new SessionState(headLo, headHi, headTable);
+            var tailSession = tailTable == null ? null : new SessionState(tailLo, tailHi, tailTable);
+            return new LinkState(epoch, announced, headSession, tailSession);
         }
 
         LinkState(long epoch, bool announced, SessionState headSession, SessionState tailSession)
@@ -81,6 +83,17 @@
 
         public bool Initialized => HeadSession != null;
 
+        public bool IsStale(long seq)
+        {
+            return seq >= HeadSession.Hi;
+        }
+
+        public bool ShouldAdvance(long seq)
+        {
+            var threshold = HeadSession.Lo + HeadSession.EpochSize / 2;
+            return seq >= threshold;
+        }
+
         public string GetTableName(long sequence)
         {
             if (HeadSession.Matches(sequence))
@@ -89,7 +102,7 @@
             }
             if (TailSession.Matches(sequence))
             {
-                return HeadSession.Table;
+                return TailSession.Table;
             }
             throw new Exception($"Provided sequence {sequence} does not match the current epoch [{HeadSession.Lo},{HeadSession.Hi}),[{TailSession.Lo},{TailSession.Hi})");
         }

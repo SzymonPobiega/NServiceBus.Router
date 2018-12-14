@@ -10,7 +10,6 @@ namespace NServiceBus.Router.Deduplication
 {
     class Dispatcher : IModule
     {
-        OutboxPersister persister;
         DeduplicationSettings settings;
         BlockingCollection<CapturedTransportOperation> operationsQueue;
         Task loopTask;
@@ -18,10 +17,9 @@ namespace NServiceBus.Router.Deduplication
         ILog logger = LogManager.GetLogger<Dispatcher>();
         Func<SqlConnection> connectionFactory;
 
-        public Dispatcher(DeduplicationSettings settings, OutboxPersister persister, Func<SqlConnection> connectionFactory)
+        public Dispatcher(DeduplicationSettings settings, Func<SqlConnection> connectionFactory)
         {
             this.settings = settings;
-            this.persister = persister;
             this.connectionFactory = connectionFactory;
             operationsQueue = new BlockingCollection<CapturedTransportOperation>(50);
         }

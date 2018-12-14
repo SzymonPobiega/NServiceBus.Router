@@ -28,7 +28,7 @@ values
 
         public async Task<LinkState> Get(string sourceKey, SqlConnection conn)
         {
-            using (var command = new SqlCommand($"select Epoch, HeadLo, HeadHi, HeadTable, TailLo, TailHi, TailTable, from [Inbox_LinkState_{destinationKey}] where Destination = @key", conn))
+            using (var command = new SqlCommand($"select Epoch, HeadLo, HeadHi, HeadTable, TailLo, TailHi, TailTable from [Inbox_LinkState_{destinationKey}] where Source = @key", conn))
             {
                 command.Parameters.AddWithValue("@key", sourceKey);
                 using (var reader = await command.ExecuteReaderAsync().ConfigureAwait(false))
@@ -45,7 +45,7 @@ values
 
         public async Task<LinkState> Lock(string sourceKey, SqlConnection conn, SqlTransaction trans)
         {
-            using (var command = new SqlCommand($"select Epoch, HeadLo, HeadHi, HeadTable, TailLo, TailHi, TailTable from [Inbox_LinkState_{destinationKey}] with (updlock) where Destination = @key", conn, trans))
+            using (var command = new SqlCommand($"select Epoch, HeadLo, HeadHi, HeadTable, TailLo, TailHi, TailTable from [Inbox_LinkState_{destinationKey}] with (updlock) where Source = @key", conn, trans))
             {
                 command.Parameters.AddWithValue("@key", sourceKey);
                 using (var reader = await command.ExecuteReaderAsync().ConfigureAwait(false))
@@ -63,14 +63,14 @@ values
         public async Task Update(string sourceKey, LinkState newLinkState, SqlConnection conn, SqlTransaction trans)
         {
             using (var command = new SqlCommand($@"
-update [InboxLinkState_{destinationKey}] set 
+update [Inbox_LinkState_{destinationKey}] set 
 Epoch = @epoch, 
 HeadLo = @headLo,
 HeadHi = @headHi,
 HeadTable = @headTable,
 TailLo = @tailLo,
 TailHi = @tailHi,
-TailTable = @tailTable,
+TailTable = @tailTable
 where Source = @key", conn, trans))
             {
                 command.Parameters.AddWithValue("@key", sourceKey);
@@ -116,10 +116,10 @@ CREATE TABLE [dbo].[Inbox_LinkState_{destinationKey}](
     [Epoch] [bigint] NOT NULL,
     [HeadLo] [bigint] NOT NULL,
     [HeadHi] [bigint] NOT NULL,
-    [HeadTable] [varchar](500) NOT NULL,
+    [HeadTable] [varchar](500) NULL,
     [TailLo] [bigint] NOT NULL,
     [TailHi] [bigint] NOT NULL,
-    [TailTable] [varchar](500) NOT NULL,
+    [TailTable] [varchar](500) NULL,
 ) ON [PRIMARY]
 ";
             using (var command = new SqlCommand(script, conn, trans))

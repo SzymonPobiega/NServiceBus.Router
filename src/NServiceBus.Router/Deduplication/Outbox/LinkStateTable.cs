@@ -17,9 +17,9 @@
         {
             using (var command = new SqlCommand($@"
 insert into [Outbox_LinkState_{sourceKey}] 
-(Destination, Epoch, HeadLo, HeadHi, HeadTable, TailLo, TailHi, TailTable) 
+(Destination, Announced, Epoch, HeadLo, HeadHi, HeadTable, TailLo, TailHi, TailTable) 
 values 
-(@dest, 0, 0, 0, NULL, 0, 0, NULL)", conn, trans))
+(@dest, 0, 0, 0, 0, NULL, 0, 0, NULL)", conn, trans))
             {
                 command.Parameters.AddWithValue("@dest", destinationKey);
                 return command.ExecuteNonQueryAsync();
@@ -28,7 +28,7 @@ values
 
         public async Task<LinkState> Get(string destinationKey, SqlConnection conn)
         {
-            using (var command = new SqlCommand($"select Epoch, HeadLo, HeadHi, HeadTable, TailLo, TailHi, TailTable from [Outbox_LinkState_{sourceKey}] where Destination = @key", conn))
+            using (var command = new SqlCommand($"select Epoch, Announced, HeadLo, HeadHi, HeadTable, TailLo, TailHi, TailTable from [Outbox_LinkState_{sourceKey}] where Destination = @key", conn))
             {
                 command.Parameters.AddWithValue("@key", destinationKey);
                 using (var reader = await command.ExecuteReaderAsync().ConfigureAwait(false))
@@ -45,7 +45,7 @@ values
 
         public async Task<LinkState> Lock(string destinationKey, SqlConnection conn, SqlTransaction trans)
         {
-            using (var command = new SqlCommand($"select Epoch, HeadLo, HeadHi, HeadTable, TailLo, TailHi, TailTable from [Outbox_LinkState_{sourceKey}] with (updlock) where Destination = @key", conn, trans))
+            using (var command = new SqlCommand($"select Epoch, Announced, HeadLo, HeadHi, HeadTable, TailLo, TailHi, TailTable from [Outbox_LinkState_{sourceKey}] with (updlock) where Destination = @key", conn, trans))
             {
                 command.Parameters.AddWithValue("@key", destinationKey);
                 using (var reader = await command.ExecuteReaderAsync().ConfigureAwait(false))
@@ -63,8 +63,9 @@ values
         public async Task Update(string destinationKey, LinkState newLinkState, SqlConnection conn, SqlTransaction trans)
         {
             using (var command = new SqlCommand($@"
-update [OutboxLinkState_{sourceKey}] set 
+update [Outbox_LinkState_{sourceKey}] set 
 Epoch = @epoch, 
+Announced = @announced,
 HeadLo = @headLo,
 HeadHi = @headHi,
 HeadTable = @headTable,
@@ -75,6 +76,7 @@ where Destination = @key", conn, trans))
             {
                 command.Parameters.AddWithValue("@key", destinationKey);
                 command.Parameters.AddWithValue("@epoch", newLinkState.Epoch);
+                command.Parameters.AddWithValue("@announced", newLinkState.IsEpochAnnounced);
                 command.Parameters.AddWithValue("@headLo", newLinkState.HeadSession.Lo);
                 command.Parameters.AddWithValue("@headHi", newLinkState.HeadSession.Hi);
                 command.Parameters.AddWithValue("@headTable", newLinkState.HeadSession.Table);
@@ -114,12 +116,13 @@ RETURN
 CREATE TABLE [dbo].[Outbox_LinkState_{sourceKey}](
     [Destination] [nvarchar](200) NOT NULL,
     [Epoch] [bigint] NOT NULL,
+    [Announced] [bit] NOT NULL,
     [HeadLo] [bigint] NOT NULL,
     [HeadHi] [bigint] NOT NULL,
-    [HeadTable] [varchar](500) NOT NULL,
+    [HeadTable] [varchar](500) NULL,
     [TailLo] [bigint] NOT NULL,
     [TailHi] [bigint] NOT NULL,
-    [TailTable] [varchar](500) NOT NULL
+    [TailTable] [varchar](500) NULL
 ) ON [PRIMARY]
 ";
             using (var command = new SqlCommand(script, conn, trans))

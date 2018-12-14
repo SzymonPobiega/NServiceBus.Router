@@ -3,7 +3,6 @@
     enum DeduplicationResult
     {
         OK,
-        Duplicate,
-        StaleLinkState,
+        Duplicate
     }
 }

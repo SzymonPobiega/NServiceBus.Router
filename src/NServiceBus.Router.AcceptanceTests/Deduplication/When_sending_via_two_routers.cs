@@ -19,7 +19,6 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
         [Test]
         public async Task Should_deliver_the_reply_back()
         {
-            var epochSize = 10;
             await Scenario.Define<Context>()
                 .WithRouter("Green-Blue", cfg =>
                 {
@@ -27,7 +26,8 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
                     {
                         c.ConnectionFactory(() => new SqlConnection(ConnectionString));
                         c.AddOutgoingLink("Blue", "Red-Blue");
-                        c.EpochSize(epochSize);
+                        c.AddIncomingLink("Blue", "Red-Blue");
+                        c.EpochSize(10);
 #pragma warning disable 618
                         c.EnableInstaller(true);
 #pragma warning restore 618
@@ -50,7 +50,9 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
                     {
                         c.ConnectionFactory(() => new SqlConnection(ConnectionString));
                         c.AddIncomingLink("Blue", "Green-Blue");
-                        c.EpochSize(epochSize);
+                        c.AddOutgoingLink("Blue", "Green-Blue");
+
+                        c.EpochSize(5);
 #pragma warning disable 618
                         c.EnableInstaller(true);
 #pragma warning restore 618
@@ -72,13 +74,20 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
                     Counter = 0
                 })))
                 .WithEndpoint<RedEndpoint>()
-                .Done(c => c.Counter > 10)
-                .Run(TimeSpan.FromSeconds(30));
+                .Done(c => c.Counter > 20)
+                .Run(TimeSpan.FromSeconds(60));
         }
 
         class Context : ScenarioContext
         {
-            public int Counter;
+            int counter;
+
+            public int Counter => Volatile.Read(ref counter);
+
+            public int IncrementCounter()
+            {
+                return Interlocked.Increment(ref counter);
+            }
         }
 
         class GreenEndpoint : EndpointConfigurationBuilder
@@ -105,7 +114,7 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
 
                 public Task Handle(GreenResponse response, IMessageHandlerContext context)
                 {
-                    var incremented = Interlocked.Increment(ref scenarioContext.Counter);
+                    var incremented = scenarioContext.IncrementCounter();
                     return context.Send(new GreenRequest
                     {
                         Counter = incremented
