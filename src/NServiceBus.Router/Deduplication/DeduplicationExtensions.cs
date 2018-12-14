@@ -2,6 +2,7 @@
 {
     using System;
     using Deduplication;
+    using Deduplication.Inbox;
 
     /// <summary>
     /// Configures message deduplication based on sequence numbers.
@@ -17,26 +18,29 @@
             var settings = new DeduplicationSettings();
 
             configAction(settings);
+            var inboxDestinationKey = routerConfig.Name;
+            var outboxSourceKey = routerConfig.Name;
 
-            var outboxPersistence = new OutboxPersister(settings.EpochSizeValue, routerConfig.Name);
-            var inboxPersistence = new InboxPersister(settings.EpochSizeValue, routerConfig.Name);
+            var inboxInstaller = new InboxInstaller(inboxDestinationKey);
+            var inboxPersisterCollection = new InboxPersisterCollection(inboxDestinationKey, settings);
 
-            var dispatcher = new Dispatcher(settings, outboxPersistence, settings.ConnFactory);
-            var outboxCleanerCollection = new OutboxCleanerCollection(settings, outboxPersistence);
-            var inboxCleanerCollection = new InboxCleanerCollection(settings, inboxPersistence);
+            var outboxInstaller = new OutboxInstaller(outboxSourceKey);
+            var outboxPersisterCollection = new OutboxPersisterCollection(outboxSourceKey, settings);
+
+            var dispatcher = new Dispatcher(settings, settings.ConnFactory);
 
             if (settings.RunInstaller)
             {
-                routerConfig.Modules.Add(new Installer(settings, outboxPersistence, inboxPersistence));
+                routerConfig.Modules.Add(new Installer(settings, outboxInstaller, inboxInstaller));
             }
 
             routerConfig.Modules.Add(dispatcher);
-            routerConfig.Modules.Add(outboxCleanerCollection);
-            routerConfig.Modules.Add(inboxCleanerCollection);
+            routerConfig.Modules.Add(outboxPersisterCollection);
+            routerConfig.Modules.Add(inboxPersisterCollection);
 
             routerConfig.AddRule(_ => new CaptureOutgoingMessageRule(settings));
-            routerConfig.AddRule(_ => new OutboxRule(outboxPersistence, outboxCleanerCollection, dispatcher));
-            routerConfig.AddRule(_ => new InboxRule(inboxPersistence, inboxCleanerCollection, settings));
+            routerConfig.AddRule(_ => new OutboxRule(outboxPersisterCollection, dispatcher));
+            routerConfig.AddRule(_ => new InboxRule(inboxPersisterCollection, settings));
 
             return settings;
         }

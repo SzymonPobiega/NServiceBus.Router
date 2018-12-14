@@ -2,17 +2,19 @@
 
 namespace NServiceBus.Router.Deduplication
 {
+    using Inbox;
+
     class Installer : IModule
     {
         DeduplicationSettings settings;
-        OutboxPersister outboxPersister;
-        InboxPersister inboxPersister;
+        OutboxInstaller outboxInstaller;
+        InboxInstaller inboxInstaller;
 
-        public Installer(DeduplicationSettings settings, OutboxPersister outboxPersister, InboxPersister inboxPersister)
+        public Installer(DeduplicationSettings settings, OutboxInstaller outboxInstaller, InboxInstaller inboxInstaller)
         {
             this.settings = settings;
-            this.outboxPersister = outboxPersister;
-            this.inboxPersister = inboxPersister;
+            this.outboxInstaller = outboxInstaller;
+            this.inboxInstaller = inboxInstaller;
         }
 
         public async Task Start(RootContext rootContext)
@@ -27,11 +29,11 @@ namespace NServiceBus.Router.Deduplication
                     {
                         foreach (var destination in settings.GetAllDestinations())
                         {
-                            await outboxPersister.Uninstall(destination, conn, trans).ConfigureAwait(false);
+                            await outboxInstaller.Uninstall(destination, conn, trans).ConfigureAwait(false);
                         }
                         foreach (var source in settings.GetAllSources())
                         {
-                            await inboxPersister.Uninstall(source, conn, trans).ConfigureAwait(false);
+                            await inboxInstaller.Uninstall(source, conn, trans).ConfigureAwait(false);
                         }
                         trans.Commit();
                     }
@@ -46,11 +48,11 @@ namespace NServiceBus.Router.Deduplication
                 {
                     foreach (var destination in settings.GetAllDestinations())
                     {
-                        await outboxPersister.Install(destination, conn, trans).ConfigureAwait(false);
+                        await outboxInstaller.Install(destination, conn, trans).ConfigureAwait(false);
                     }
                     foreach (var source in settings.GetAllSources())
                     {
-                        await inboxPersister.Install(source, conn, trans).ConfigureAwait(false);
+                        await inboxInstaller.Install(source, conn, trans).ConfigureAwait(false);
                     }
                     trans.Commit();
                 }

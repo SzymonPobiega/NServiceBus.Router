@@ -10,7 +10,6 @@ namespace NServiceBus.Router.Deduplication
 {
     class Dispatcher : IModule
     {
-        OutboxPersister persister;
         DeduplicationSettings settings;
         BlockingCollection<CapturedTransportOperation> operationsQueue;
         Task loopTask;
@@ -18,10 +17,9 @@ namespace NServiceBus.Router.Deduplication
         ILog logger = LogManager.GetLogger<Dispatcher>();
         Func<SqlConnection> connectionFactory;
 
-        public Dispatcher(DeduplicationSettings settings, OutboxPersister persister, Func<SqlConnection> connectionFactory)
+        public Dispatcher(DeduplicationSettings settings, Func<SqlConnection> connectionFactory)
         {
             this.settings = settings;
-            this.persister = persister;
             this.connectionFactory = connectionFactory;
             operationsQueue = new BlockingCollection<CapturedTransportOperation>(50);
         }
@@ -90,13 +88,12 @@ namespace NServiceBus.Router.Deduplication
                 using (var trans = conn.BeginTransaction())
                 {
                     //Will block until the record insert transaction is completed.
-                    await persister.MarkDispatched(operation, conn, trans).ConfigureAwait(false);
+                    await OutboxPersister.MarkAsDispatched(operation, conn, trans).ConfigureAwait(false);
 
                     var iface = settings.GetDestinationInterface(operation.Destination);
 
                     var chains = rootContext.Interfaces.GetChainsFor(iface);
                     var chain = chains.Get<AnycastContext>();
-
                     var dispatchContext = new OutboxDispatchContext(rootContext, iface);
                     var forwardContext = new AnycastContext(operation.Destination, operation.OutgoingMessage, DistributionStrategyScope.Send, dispatchContext);
                     dispatchContext.Set(new TransportTransaction());

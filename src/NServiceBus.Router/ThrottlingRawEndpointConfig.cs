@@ -161,7 +161,9 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
 
     Task IDispatchMessages.Dispatch(TransportOperations outgoingMessages, TransportTransaction transaction, ContextBag context)
     {
-        return endpoint.Dispatch(outgoingMessages, transaction, context);
+        return endpoint != null 
+            ? endpoint.Dispatch(outgoingMessages, transaction, context) 
+            : startable.Dispatch(outgoingMessages, transaction, context);
     }
 
     string IRawEndpoint.TransportAddress => startable?.TransportAddress ?? endpoint.TransportAddress;

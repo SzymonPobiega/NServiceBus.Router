@@ -9,15 +9,13 @@
 
     class OutboxRule : IRule<RawContext, RawContext>
     {
-        OutboxPersister persister;
-        OutboxCleanerCollection outboxCleanerCollection;
+        OutboxPersisterCollection outboxPersisterCollection;
         Dispatcher dispatcher;
 
-        public OutboxRule(OutboxPersister persister, OutboxCleanerCollection outboxCleanerCollection, Dispatcher dispatcher)
+        public OutboxRule(OutboxPersisterCollection outboxPersisterCollection, Dispatcher dispatcher)
         {
-            this.persister = persister;
-            this.outboxCleanerCollection = outboxCleanerCollection;
             this.dispatcher = dispatcher;
+            this.outboxPersisterCollection = outboxPersisterCollection;
         }
 
         public async Task Invoke(RawContext context, Func<RawContext, Task> next)
@@ -39,15 +37,24 @@
             if (!transportTransaction.TryGet<SqlConnection>(out var connection)
                 || !transportTransaction.TryGet<SqlTransaction>(out var transaction))
             {
-                throw new Exception("For the deduplicating link to work the incoming interface has to use SQL Server transport in native transaction mode.");
+                throw new Exception("For the de-duplicating link to work the incoming interface has to use SQL Server transport in native transaction mode.");
             }
 
-            await persister.Store(capturedMessages, outboxCleanerCollection.UpdateInsertedSequence, connection, transaction).ConfigureAwait(false);
+            await Store(capturedMessages, connection, transaction).ConfigureAwait(false);
 
             foreach (var operation in capturedMessages)
             {
                 dispatcher.Enqueue(operation);
             }
         }
+
+        async Task Store(List<CapturedTransportOperation> capturedMessages, SqlConnection connection, SqlTransaction transaction)
+        {
+            foreach (var op in capturedMessages)
+            {
+                await outboxPersisterCollection.Store(op, connection, transaction).ConfigureAwait(false);
+            }
+        }
+
     }
 }

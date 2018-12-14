@@ -4,6 +4,7 @@ using System.Data.SqlClient;
 using System.Linq;
 using System.Threading.Tasks;
 using NServiceBus.Logging;
+using NServiceBus.Router;
 using NServiceBus.Router.Deduplication;
 using NServiceBus.Transport;
 using NUnit.Framework;
@@ -12,20 +13,23 @@ using NUnit.Framework;
 public class OutboxPersisterTests
 {
     OutboxPersister persister;
+    OutboxInstaller installer;
 
     [SetUp]
     public async Task PrepareTables()
     {
         LogManager.Use<DefaultFactory>().Level(LogLevel.Debug);
 
-        persister = new OutboxPersister(3, "S");
+        installer = new OutboxInstaller("S");
+        persister = new OutboxPersister(3, "S", "D");
         using (var conn = CreateConnection())
         {
             await conn.OpenAsync().ConfigureAwait(false);
 
             using (var trans = conn.BeginTransaction())
             {
-                await persister.Install("A", conn, trans).ConfigureAwait(false);
+                await installer.Uninstall("D", conn, trans).ConfigureAwait(false);
+                await installer.Install("D", conn, trans).ConfigureAwait(false);
                 trans.Commit();
             }
         }
@@ -39,19 +43,16 @@ public class OutboxPersisterTests
     [Test]
     public async Task It_stores_messages_in_tables_based_on_sequence_number()
     {
-
         using (var conn = CreateConnection())
         {
             await conn.OpenAsync().ConfigureAwait(false);
 
             using (var trans = conn.BeginTransaction())
             {
-                var sequences = new Dictionary<string, long>();
-
                 for (var i = 1; i <= 6; i++)
                 {
-                    var messages = CreateMessages(Guid.NewGuid().ToString());
-                    await persister.Store(messages, (key, value) => { sequences[key] = value; }, conn, trans).ConfigureAwait(false);
+                    var operation = CreateMessages(Guid.NewGuid().ToString());
+                    await persister.Store(operation, () => {}, conn, trans).ConfigureAwait(false);
                 }
 
                 trans.Commit();
@@ -59,106 +60,163 @@ public class OutboxPersisterTests
         }
     }
 
-    static List<CapturedTransportOperation> CreateMessages(string messageId)
+    static CapturedTransportOperation CreateMessages(string messageId)
     {
         var outgoingMessage = new OutgoingMessage(messageId, new Dictionary<string, string>(), new byte[3]);
-        var messages = new List<CapturedTransportOperation>
-        {
-            new CapturedTransportOperation(outgoingMessage, "A")
-        };
-        return messages;
+        return new CapturedTransportOperation(outgoingMessage, "D");
     }
 
     [Test]
-    [Explicit]
-    public async Task Cannot_close_empty_epoch()
+    public async Task Can_advance_without_sending()
     {
-        using (var conn = new SqlConnection("data source = (local); initial catalog=test1; integrated security=true"))
+        using (var conn = CreateConnection())
         {
             await conn.OpenAsync().ConfigureAwait(false);
-            var (lo, hi) = await persister.TryClose("A", 0, 6, operation =>
+
+            Task Dispatch(OutgoingMessage operation)
             {
                 Console.WriteLine(operation.MessageId);
                 return Task.CompletedTask;
-            }, conn);
+            }
 
-            Assert.AreEqual(0, lo);
-            Assert.AreEqual(6, hi);
+            await persister.Initialize(Dispatch, conn);
+            await persister.TryAdvance(Dispatch, conn);
+            await persister.TryAdvance(Dispatch, conn);
+            var linkState = await persister.TryAdvance(Dispatch, conn);
+
+            Assert.AreEqual(4, linkState.Epoch);
         }
     }
 
     [Test]
     public async Task Can_close_non_empty_table()
     {
-        var sequences = new Dictionary<string, long>();
-
-        using (var conn = new SqlConnection("data source = (local); initial catalog=test1; integrated security=true"))
+        using (var conn = CreateConnection())
         {
             await conn.OpenAsync().ConfigureAwait(false);
 
-            await persister.Store(CreateMessages("M1"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
-            await persister.Store(CreateMessages("M2"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
-            await persister.Store(CreateMessages("M3"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
-            await persister.Store(CreateMessages("M4"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
-
-            var (lo, hi) = await persister.TryClose("A", 0, 6, operation =>
+            Task Dispatch(OutgoingMessage operation)
             {
                 Console.WriteLine(operation.MessageId);
                 return Task.CompletedTask;
-            }, conn);
+            }
 
-            await persister.Store(CreateMessages("M5"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
+            await persister.Initialize(Dispatch, conn);
 
-            Assert.AreEqual(3, lo);
-            Assert.AreEqual(9, hi);
+            await persister.Store(CreateMessages("M1"), () => { }, conn, null).ConfigureAwait(false);
+            await persister.Store(CreateMessages("M2"), () => { }, conn, null).ConfigureAwait(false);
+            await persister.Store(CreateMessages("M3"), () => { }, conn, null).ConfigureAwait(false);
+            await persister.Store(CreateMessages("M4"), () => { }, conn, null).ConfigureAwait(false);
+
+            var linkState = await persister.TryAdvance(Dispatch, conn);
+
+            await persister.Store(CreateMessages("M5"), () => { }, conn, null).ConfigureAwait(false);
+
+            Assert.AreEqual(6, linkState.HeadSession.Lo);
+            Assert.AreEqual(9, linkState.HeadSession.Hi);
         }
     }
 
     [Test]
-    public async Task It_refuses_to_insert_when_full()
+    public async Task It_triggers_advance_when_stale_or_full()
     {
-        var sequences = new Dictionary<string, long>();
-
-        using (var conn = new SqlConnection("data source = (local); initial catalog=test1; integrated security=true"))
+        using (var conn = CreateConnection())
         {
             await conn.OpenAsync().ConfigureAwait(false);
 
-            await persister.Store(CreateMessages("M1"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
-            await persister.Store(CreateMessages("M2"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
-            await persister.Store(CreateMessages("M3"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
-            await persister.Store(CreateMessages("M4"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
-            await persister.Store(CreateMessages("M5"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
-            await persister.Store(CreateMessages("M6"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
+            Task Dispatch(OutgoingMessage operation)
+            {
+                Console.WriteLine(operation.MessageId);
+                return Task.CompletedTask;
+            }
 
-            await persister.Store(CreateMessages("M7"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
+            await persister.Initialize(Dispatch, conn);
+
+            await persister.Store(CreateMessages("M1"), () => { }, conn, null).ConfigureAwait(false);
+            await persister.Store(CreateMessages("M2"), () => { }, conn, null).ConfigureAwait(false);
+            await persister.Store(CreateMessages("M3"), () => { }, conn, null).ConfigureAwait(false);
+            await persister.Store(CreateMessages("M4"), () => { }, conn, null).ConfigureAwait(false);
+            await persister.Store(CreateMessages("M5"), () => { }, conn, null).ConfigureAwait(false);
+            await persister.Store(CreateMessages("M6"), () => { }, conn, null).ConfigureAwait(false);
+
+            var advanceTriggered = false;
+            try
+            {
+                await persister.Store(CreateMessages("M7"), () => { advanceTriggered = true; }, conn, null).ConfigureAwait(false);
+            }
+            catch (ProcessCurrentMessageLaterException)
+            {
+                //Swallow
+            }
+
+            Assert.IsTrue(advanceTriggered);
+        }
+    }
+
+    [Test]
+    public async Task It_triggers_advance_when_head_table_is_half_full()
+    {
+        using (var conn = CreateConnection())
+        {
+            await conn.OpenAsync().ConfigureAwait(false);
+
+            Task Dispatch(OutgoingMessage operation)
+            {
+                Console.WriteLine(operation.MessageId);
+                return Task.CompletedTask;
+            }
+
+            await persister.Initialize(Dispatch, conn);
+
+            var advanceTriggered = false;
+            void TriggerAdvance()
+            {
+                advanceTriggered = true;
+            }
+
+            await persister.Store(CreateMessages("M1"), TriggerAdvance, conn, null).ConfigureAwait(false);
+            await persister.Store(CreateMessages("M2"), TriggerAdvance, conn, null).ConfigureAwait(false);
+            await persister.Store(CreateMessages("M3"), TriggerAdvance, conn, null).ConfigureAwait(false);
+            await persister.Store(CreateMessages("M4"), TriggerAdvance, conn, null).ConfigureAwait(false);
+
+            //Not yet
+            Assert.IsFalse(advanceTriggered);
+
+            await persister.Store(CreateMessages("M5"), TriggerAdvance, conn, null).ConfigureAwait(false);
+
+            //Now
+            Assert.IsTrue(advanceTriggered);
         }
     }
 
     [Test]
     public async Task It_detects_a_gap_when_it_is_in_the_middle_of_the_epoch()
     {
-        var sequences = new Dictionary<string, long>();
-
-        using (var conn = new SqlConnection("data source = (local); initial catalog=test1; integrated security=true"))
+        using (var conn = CreateConnection())
         {
             await conn.OpenAsync().ConfigureAwait(false);
 
-            await persister.Store(CreateMessages("M1"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
-
-            await GetNextSequenceValue("S_A", conn, null);
-
-            await persister.Store(CreateMessages("M3"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
-
             var dispatchedMessages = new List<OutgoingMessage>();
-
-            var (lo, hi) = await persister.TryClose("A", 0, 6, operation =>
+            Task Dispatch(OutgoingMessage operation)
             {
                 dispatchedMessages.Add(operation);
                 return Task.CompletedTask;
-            }, conn);
+            }
 
-            Assert.AreEqual(3, lo);
-            Assert.AreEqual(9, hi);
+            await persister.Initialize(Dispatch, conn);
+            void TriggerAdvance()
+            {
+                //NOOP
+            }
+
+            await persister.Store(CreateMessages("M1"), TriggerAdvance, conn, null).ConfigureAwait(false);
+            await GetNextSequenceValue("S_D", conn, null);
+            await persister.Store(CreateMessages("M3"), TriggerAdvance, conn, null).ConfigureAwait(false);
+
+            var linkState = await persister.TryAdvance(Dispatch, conn);
+
+            Assert.AreEqual(3, linkState.TailSession.Lo);
+            Assert.AreEqual(9, linkState.HeadSession.Hi);
 
             var plug = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterHeaders.Plug));
             Assert.AreEqual("1", plug.Headers[RouterHeaders.SequenceNumber]);
@@ -168,58 +226,60 @@ public class OutboxPersisterTests
     [Test]
     public async Task It_detects_a_gap_when_it_is_bigger_than_one_row()
     {
-        var sequences = new Dictionary<string, long>();
 
-        using (var conn = new SqlConnection("data source = (local); initial catalog=test1; integrated security=true"))
+        using (var conn = CreateConnection())
         {
             await conn.OpenAsync().ConfigureAwait(false);
 
-            await persister.Store(CreateMessages("M1"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
-
             var dispatchedMessages = new List<OutgoingMessage>();
 
-            var (lo, hi) = await persister.TryClose("A", 0, 6, operation =>
+            Task Dispatch(OutgoingMessage operation)
             {
                 dispatchedMessages.Add(operation);
                 return Task.CompletedTask;
-            }, conn);
+            }
 
-            Assert.AreEqual(3, lo);
-            Assert.AreEqual(9, hi);
+            await persister.Initialize(Dispatch, conn);
+            await persister.Store(CreateMessages("M1"), () => { }, conn, null);
+            var linkState = await persister.TryAdvance(Dispatch, conn);
+
+            Assert.AreEqual(3, linkState.TailSession.Lo);
+            Assert.AreEqual(9, linkState.HeadSession.Hi);
 
             var plugsSequenceNumbers = dispatchedMessages
                 .Where(m => m.Headers.ContainsKey(RouterHeaders.Plug))
                 .Select(m => m.Headers[RouterHeaders.SequenceNumber])
                 .ToArray();
 
-            CollectionAssert.AreEqual(new[] {"1", "2"}, plugsSequenceNumbers );
+            CollectionAssert.AreEqual(new[] { "1", "2" }, plugsSequenceNumbers);
         }
     }
 
     [Test]
     public async Task It_detects_a_gap_when_it_is_at_the_beginning_of_the_epoch()
     {
-        var sequences = new Dictionary<string, long>();
-
-        using (var conn = new SqlConnection("data source = (local); initial catalog=test1; integrated security=true"))
+        using (var conn = CreateConnection())
         {
             await conn.OpenAsync().ConfigureAwait(false);
 
-            await GetNextSequenceValue("S_A", conn, null);
-
-            await persister.Store(CreateMessages("M2"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
-            await persister.Store(CreateMessages("M3"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
-
             var dispatchedMessages = new List<OutgoingMessage>();
-
-            var (lo, hi) = await persister.TryClose("A", 0, 6, operation =>
+            Task Dispatch(OutgoingMessage operation)
             {
                 dispatchedMessages.Add(operation);
                 return Task.CompletedTask;
-            }, conn);
+            }
 
-            Assert.AreEqual(3, lo);
-            Assert.AreEqual(9, hi);
+            await persister.Initialize(Dispatch, conn);
+
+            await GetNextSequenceValue("S_D", conn, null);
+
+            await persister.Store(CreateMessages("M2"), () => { }, conn, null).ConfigureAwait(false);
+            await persister.Store(CreateMessages("M3"), () => { }, conn, null).ConfigureAwait(false);
+
+            var linkState = await persister.TryAdvance(Dispatch, conn);
+
+            Assert.AreEqual(3, linkState.TailSession.Lo);
+            Assert.AreEqual(9, linkState.HeadSession.Hi);
 
             var plug = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterHeaders.Plug));
             Assert.AreEqual("0", plug.Headers[RouterHeaders.SequenceNumber]);
@@ -229,26 +289,26 @@ public class OutboxPersisterTests
     [Test]
     public async Task It_detects_a_gap_when_it_is_at_the_end_of_the_epoch()
     {
-        var sequences = new Dictionary<string, long>();
-
-        using (var conn = new SqlConnection("data source = (local); initial catalog=test1; integrated security=true"))
+        using (var conn = CreateConnection())
         {
             await conn.OpenAsync().ConfigureAwait(false);
 
-
-            await persister.Store(CreateMessages("M1"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
-            await persister.Store(CreateMessages("M2"), (key, value) => { sequences[key] = value; }, conn, null).ConfigureAwait(false);
-
             var dispatchedMessages = new List<OutgoingMessage>();
-
-            var (lo, hi) = await persister.TryClose("A", 0, 6, operation =>
+            Task Dispatch(OutgoingMessage operation)
             {
                 dispatchedMessages.Add(operation);
                 return Task.CompletedTask;
-            }, conn);
+            }
 
-            Assert.AreEqual(3, lo);
-            Assert.AreEqual(9, hi);
+            await persister.Initialize(Dispatch, conn);
+
+            await persister.Store(CreateMessages("M1"), () => { }, conn, null).ConfigureAwait(false);
+            await persister.Store(CreateMessages("M2"), () => { }, conn, null).ConfigureAwait(false);
+
+            var linkState = await persister.TryAdvance(Dispatch, conn);
+
+            Assert.AreEqual(3, linkState.TailSession.Lo);
+            Assert.AreEqual(9, linkState.HeadSession.Hi);
 
             var plug = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterHeaders.Plug));
             Assert.AreEqual("2", plug.Headers[RouterHeaders.SequenceNumber]);
@@ -258,20 +318,23 @@ public class OutboxPersisterTests
     [Test]
     public async Task It_detects_a_gap_when_the_epoch_is_empty()
     {
-        using (var conn = new SqlConnection("data source = (local); initial catalog=test1; integrated security=true"))
+        using (var conn = CreateConnection())
         {
             await conn.OpenAsync().ConfigureAwait(false);
 
             var dispatchedMessages = new List<OutgoingMessage>();
-
-            var (lo, hi) = await persister.TryClose("A", 0, 6, operation =>
+            Task Dispatch(OutgoingMessage operation)
             {
                 dispatchedMessages.Add(operation);
                 return Task.CompletedTask;
-            }, conn);
+            }
 
-            Assert.AreEqual(3, lo);
-            Assert.AreEqual(9, hi);
+            await persister.Initialize(Dispatch, conn);
+
+            var linkState = await persister.TryAdvance(Dispatch, conn);
+
+            Assert.AreEqual(3, linkState.TailSession.Lo);
+            Assert.AreEqual(9, linkState.HeadSession.Hi);
 
             var plugsSequenceNumbers = dispatchedMessages
                 .Where(m => m.Headers.ContainsKey(RouterHeaders.Plug))
@@ -279,6 +342,129 @@ public class OutboxPersisterTests
                 .ToArray();
 
             CollectionAssert.AreEqual(new[] { "0", "1", "2" }, plugsSequenceNumbers);
+        }
+    }
+
+    [Test]
+    public async Task It_sends_announce_message_when_advancing()
+    {
+        using (var conn = CreateConnection())
+        {
+            await conn.OpenAsync().ConfigureAwait(false);
+
+            var dispatchedMessages = new List<OutgoingMessage>();
+            Task Dispatch(OutgoingMessage operation)
+            {
+                dispatchedMessages.Add(operation);
+                return Task.CompletedTask;
+            }
+
+            await persister.Initialize(Dispatch, conn);
+
+            var linkState = await persister.TryAdvance(Dispatch, conn);
+
+            Assert.AreEqual(6, linkState.HeadSession.Lo);
+            Assert.AreEqual(9, linkState.HeadSession.Hi);
+
+            var advanceMessage = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterHeaders.Advance));
+
+            Assert.AreEqual("2", advanceMessage.Headers[RouterHeaders.AdvanceEpoch]);
+            Assert.AreEqual("6", advanceMessage.Headers[RouterHeaders.AdvanceHeadLo]);
+            Assert.AreEqual("9", advanceMessage.Headers[RouterHeaders.AdvanceHeadHi]);
+        }
+    }
+
+    [Test]
+    public async Task It_retries_announcing_advance()
+    {
+        using (var conn = CreateConnection())
+        {
+            await conn.OpenAsync().ConfigureAwait(false);
+
+            var dispatchedMessages = new List<OutgoingMessage>();
+            Task Dispatch(OutgoingMessage operation)
+            {
+                dispatchedMessages.Add(operation);
+                return Task.CompletedTask;
+            }
+
+            await persister.Initialize(Dispatch, conn);
+
+            var announceFailed = false;
+            try
+            {
+                await persister.TryAdvance(op =>
+                {
+                    if (op.Headers.ContainsKey(RouterHeaders.Advance))
+                    {
+                        throw new Exception("Simulated");
+                    }
+                    return Dispatch(op);
+                }, conn);
+            }
+            catch (Exception)
+            {
+                announceFailed = true;
+            }
+
+            Assert.IsTrue(announceFailed);
+
+            var linkState = await persister.TryAdvance(Dispatch, conn);
+
+            Assert.AreEqual(6, linkState.HeadSession.Lo);
+            Assert.AreEqual(9, linkState.HeadSession.Hi);
+
+            var advanceMessage = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterHeaders.Advance));
+
+            Assert.AreEqual("2", advanceMessage.Headers[RouterHeaders.AdvanceEpoch]);
+            Assert.AreEqual("6", advanceMessage.Headers[RouterHeaders.AdvanceHeadLo]);
+            Assert.AreEqual("9", advanceMessage.Headers[RouterHeaders.AdvanceHeadHi]);
+        }
+    }
+
+    [Test]
+    public async Task It_retries_announcing_advance_when_initializing()
+    {
+        using (var conn = CreateConnection())
+        {
+            await conn.OpenAsync().ConfigureAwait(false);
+
+            var dispatchedMessages = new List<OutgoingMessage>();
+            Task Dispatch(OutgoingMessage operation)
+            {
+                dispatchedMessages.Add(operation);
+                return Task.CompletedTask;
+            }
+
+            await persister.Initialize(Dispatch, conn);
+
+            var announceFailed = false;
+            try
+            {
+                await persister.TryAdvance(op =>
+                {
+                    if (op.Headers.ContainsKey(RouterHeaders.Advance))
+                    {
+                        throw new Exception("Simulated");
+                    }
+                    return Dispatch(op);
+                }, conn);
+            }
+            catch (Exception)
+            {
+                announceFailed = true;
+            }
+
+            Assert.IsTrue(announceFailed);
+
+            var newPersister = new OutboxPersister(3, "S", "D");
+            await newPersister.Initialize(Dispatch, conn);
+
+            var advanceMessage = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterHeaders.Advance));
+
+            Assert.AreEqual("2", advanceMessage.Headers[RouterHeaders.AdvanceEpoch]);
+            Assert.AreEqual("6", advanceMessage.Headers[RouterHeaders.AdvanceHeadLo]);
+            Assert.AreEqual("9", advanceMessage.Headers[RouterHeaders.AdvanceHeadHi]);
         }
     }
 
