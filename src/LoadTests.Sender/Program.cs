@@ -5,6 +5,7 @@
     using System.Threading.Tasks;
     using Metrics;
     using NServiceBus;
+    using NServiceBus.Transport.SQLServer;
 
     class Program
     {
@@ -31,6 +32,7 @@
             config.RegisterComponents(c => c.RegisterSingleton(new LoadGenerator((info, token) => GenerateMessages(bodySize, info, token, maxConcurrency), 10000, 20000)));
 
             var senderTransport = config.UseTransport<SqlServerTransport>();
+            senderTransport.UseNativeDelayedDelivery().DisableTimeoutManagerCompatibility();
             senderTransport.ConnectionString(connectionString);
             senderTransport.Transactions(TransportTransactionMode.SendsAtomicWithReceive);
 

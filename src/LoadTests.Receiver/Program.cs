@@ -4,6 +4,7 @@
     using System.Threading.Tasks;
     using Metrics;
     using NServiceBus;
+    using NServiceBus.Transport.SQLServer;
 
     class Program
     {
@@ -32,6 +33,7 @@
             var connectionString = SettingsReader<string>.Read("SqlConnectionString", "data source=(local); initial catalog=loadtest; integrated security=true");
 
             var senderTransport = config.UseTransport<SqlServerTransport>();
+            senderTransport.UseNativeDelayedDelivery().DisableTimeoutManagerCompatibility();
             senderTransport.ConnectionString(connectionString);
             senderTransport.Transactions(TransportTransactionMode.SendsAtomicWithReceive);
 

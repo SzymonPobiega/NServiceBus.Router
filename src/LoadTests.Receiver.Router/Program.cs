@@ -42,6 +42,9 @@
             {
                 routerConfig.EnableDeduplication(d =>
                 {
+#pragma warning disable 618
+                    d.EnableInstaller(true);
+#pragma warning restore 618
                     d.EpochSize(epochSize);
                     d.ConnectionFactory(() => new SqlConnection(sqlConnectionString));
                     d.AddIncomingLink("Rabbit", "Sender.Router");

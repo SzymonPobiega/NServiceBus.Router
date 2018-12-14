@@ -16,6 +16,9 @@
         public Task InitializeLink(string destinationKey, SqlConnection conn, SqlTransaction trans)
         {
             using (var command = new SqlCommand($@"
+if exists (select * from [Outbox_LinkState_{sourceKey}] where Destination = @dest)
+    return
+
 insert into [Outbox_LinkState_{sourceKey}] 
 (Destination, Announced, Epoch, HeadLo, HeadHi, HeadTable, TailLo, TailHi, TailTable) 
 values 
@@ -26,9 +29,9 @@ values
             }
         }
 
-        public async Task<LinkState> Get(string destinationKey, SqlConnection conn)
+        public async Task<LinkState> Get(string destinationKey, SqlConnection conn, SqlTransaction trans = null)
         {
-            using (var command = new SqlCommand($"select Epoch, Announced, HeadLo, HeadHi, HeadTable, TailLo, TailHi, TailTable from [Outbox_LinkState_{sourceKey}] where Destination = @key", conn))
+            using (var command = new SqlCommand($"select Epoch, Announced, HeadLo, HeadHi, HeadTable, TailLo, TailHi, TailTable from [Outbox_LinkState_{sourceKey}] where Destination = @key", conn, trans))
             {
                 command.Parameters.AddWithValue("@key", destinationKey);
                 using (var reader = await command.ExecuteReaderAsync().ConfigureAwait(false))
@@ -122,7 +125,11 @@ CREATE TABLE [dbo].[Outbox_LinkState_{sourceKey}](
     [HeadTable] [varchar](500) NULL,
     [TailLo] [bigint] NOT NULL,
     [TailHi] [bigint] NOT NULL,
-    [TailTable] [varchar](500) NULL
+    [TailTable] [varchar](500) NULL,
+CONSTRAINT [PK_Outbox_LinkState_{sourceKey}] PRIMARY KEY CLUSTERED 
+(
+	[Destination] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
 ) ON [PRIMARY]
 ";
             using (var command = new SqlCommand(script, conn, trans))

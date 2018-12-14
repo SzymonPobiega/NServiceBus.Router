@@ -222,7 +222,7 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
             //Only increment the delayed retries count if CB was not armed. That means that at least one message was
             //successfully forwarded in between previous failure of this message and this failure.
             //This prevents prematurely exhausting delayed retries attempts without triggering the throttled mode
-            if (!circuitBreaker.IsArmed)
+            if (!circuitBreaker.IsArmed && !(handlingContext.Error.Exception is ProcessCurrentMessageLaterException))
             {
                 var newDelayedRetriesHeaderValue = handlingContext.Error.DelayedDeliveriesPerformed + 1;
                 incomingMessage.Headers[Headers.DelayedRetries] = newDelayedRetriesHeaderValue.ToString();

@@ -18,6 +18,7 @@
         LinkStateTable linkStateTable;
         OutboxSequence sequence;
         LinkState linkState;
+        long highestSeq;
 
         public OutboxPersister(int epochSize, string sourceKey, string destinationKey)
         {
@@ -33,10 +34,11 @@
             var localState = linkState;
 
             var seq = await sequence.GetNextValue(conn, trans).ConfigureAwait(false);
+            InterlocedEx.ExchangeIfGreaterThan(ref highestSeq, seq);
 
             if (localState.IsStale(seq))
             {
-                var freshLinkState = await linkStateTable.Get(operation.Destination, conn).ConfigureAwait(false);
+                var freshLinkState = await linkStateTable.Get(operation.Destination, conn, trans).ConfigureAwait(false);
                 UpdateCachedLinkState(freshLinkState);
                 localState = linkState;
             }
@@ -69,7 +71,7 @@
             {
                 if (e.Number == 547) //Constraint violation. We used very old seq and that value cannot be used any more because the epoch has advanced.
                 {
-                    var freshLinkState = await linkStateTable.Get(operation.Destination, conn).ConfigureAwait(false);
+                    var freshLinkState = await linkStateTable.Get(operation.Destination, conn, trans).ConfigureAwait(false);
                     UpdateCachedLinkState(freshLinkState);
                     throw new ProcessCurrentMessageLaterException("Link state is stale. Processing current message later.");
                 }
@@ -119,7 +121,7 @@
             {
                 return initializedState;
             }
-            return initializedState.Epoch == 1 
+            return initializedState.Epoch == 1
                 ? await AnnounceInitialize(initializedState, dispatch, conn).ConfigureAwait(false)
                 : await AnnounceAdvance(initializedState, dispatch, conn).ConfigureAwait(false);
         }
@@ -141,7 +143,7 @@
             if (!lockedLinkState.Initialized)
             {
                 var initializedState = lockedLinkState.Initialize(
-                    OutboxTable.Left(sourceKey, destinationKey), 
+                    OutboxTable.Left(sourceKey, destinationKey),
                     OutboxTable.Right(sourceKey, destinationKey), epochSize);
 
                 await initializedState.HeadSession.CreateConstraint(conn, initTransaction);
@@ -163,10 +165,15 @@
 
         async Task<LinkState> Advance(Func<OutgoingMessage, Task> dispatch, SqlConnection conn)
         {
-            log.Debug($"Attempting advance epoch for destination {destinationKey} based on link state {linkState}.");
-
             //Let's actually check if our values are correct.
             var queriedLinkState = await linkStateTable.Get(destinationKey, conn);
+
+            if (!queriedLinkState.ShouldAdvance(highestSeq))
+            {
+                return queriedLinkState;
+            }
+
+            log.Debug($"Attempting advance epoch for destination {destinationKey} based on link state {linkState}.");
 
             if (!queriedLinkState.IsEpochAnnounced)
             {
