@@ -4,7 +4,7 @@ using NServiceBus.AcceptanceTests;
 using NServiceBus.AcceptanceTests.EndpointTemplates;
 using NUnit.Framework;
 
-namespace NServiceBus.Router.AcceptanceTests.SingleRouter
+namespace NServiceBus.Router.AcceptanceTests.BridgeConnector
 {
     using AcceptanceTesting.Customization;
 
@@ -71,7 +71,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 EndpointSetup<DefaultServer>(c =>
                 {
                     var routing = c.UseTransport<TestTransport>().BrokerBravo().Routing();
-                    var bridge = routing.ConnectToRouter("Router");
+                    var bridge = routing.ConnectToBridge("Router");
                     bridge.RegisterPublisher(typeof(MyBaseEvent), Conventions.EndpointNamingConvention(typeof(Publisher)));
                 });
             }
@@ -100,7 +100,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 EndpointSetup<DefaultServer>(c =>
                 {
                     var routing = c.UseTransport<TestTransport>().BrokerBravo().Routing();
-                    var bridge = routing.ConnectToRouter("Router");
+                    var bridge = routing.ConnectToBridge("Router");
                     bridge.RegisterPublisher(typeof(MyDerivedEvent), Conventions.EndpointNamingConvention(typeof(Publisher)));
                 });
             }
