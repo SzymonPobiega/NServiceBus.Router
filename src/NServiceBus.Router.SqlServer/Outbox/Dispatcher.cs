@@ -2,10 +2,10 @@
 {
     using System;
     using System.Collections.Concurrent;
-    using System.Data.SqlClient;
     using System.Threading;
     using System.Threading.Tasks;
     using Logging;
+    using Settings;
     using Transport;
 
     class Dispatcher : IModule
@@ -15,12 +15,10 @@
         Task loopTask;
         CancellationTokenSource tokenSource;
         ILog logger = LogManager.GetLogger<Dispatcher>();
-        Func<SqlConnection> connectionFactory;
 
-        public Dispatcher(DeduplicationSettings settings, Func<SqlConnection> connectionFactory)
+        public Dispatcher(DeduplicationSettings settings)
         {
             this.settings = settings;
-            this.connectionFactory = connectionFactory;
             operationsQueue = new BlockingCollection<CapturedTransportOperation>(50);
         }
 
@@ -29,7 +27,7 @@
             operationsQueue.Add(operation);
         }
 
-        public Task Start(RootContext rootContext)
+        public Task Start(RootContext rootContext, SettingsHolder extensibilitySettings)
         {
             tokenSource = new CancellationTokenSource();
             var throttle = new SemaphoreSlim(8);
@@ -81,7 +79,7 @@
 
         async Task Dispatch(CapturedTransportOperation operation, RootContext rootContext)
         {
-            using (var conn = connectionFactory())
+            using (var conn = settings.Links[operation.Destination].ConnectionFactory())
             {
                 await conn.OpenAsync().ConfigureAwait(false);
 

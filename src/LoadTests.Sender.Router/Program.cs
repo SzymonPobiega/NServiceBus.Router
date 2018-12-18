@@ -6,6 +6,7 @@ namespace LoadTests.Sender.Router
     using System.Threading.Tasks;
     using NServiceBus;
     using NServiceBus.Router;
+
     class Program
     {
         static void Main(string[] args)
@@ -17,39 +18,31 @@ namespace LoadTests.Sender.Router
         {
             var sqlConnectionString = SettingsReader<string>.Read("SqlConnectionString", "data source=(local); initial catalog=loadtest; integrated security=true");
             var rabbitConnectionString = SettingsReader<string>.Read("RabbitConnectionString", "host=localhost");
-            var deduplication = SettingsReader<bool>.Read("Deduplicate");
             var epochSize = SettingsReader<int>.Read("EpochSize", 10000);
 
             var routerConfig = new RouterConfiguration("Sender.Router");
             routerConfig.AutoCreateQueues();
-            routerConfig.AddInterface<SqlServerTransport>("SQL", t =>
-                {
-                    t.ConnectionString(sqlConnectionString);
-                    t.Transactions(TransportTransactionMode.SendsAtomicWithReceive);
-                })
-                .UseSubscriptionPersistence(new SqlSubscriptionStorage(() => new SqlConnection(sqlConnectionString), "SenderRouter", new SqlDialect.MsSqlServer(), null));
+            var deduplicationConfig = routerConfig.ConfigureDeduplication();
+#pragma warning disable 618
+            deduplicationConfig.EnableInstaller(true);
+#pragma warning restore 618
 
-            routerConfig.AddInterface<RabbitMQTransport>("Rabbit", t =>
+            var linkInterface = routerConfig.AddInterface<RabbitMQTransport>("Rabbit", t =>
             {
                 t.ConnectionString(rabbitConnectionString);
                 t.UseConventionalRoutingTopology();
             });
 
+            var sqlInterface = routerConfig.AddInterface<SqlServerTransport>("SQL", t =>
+            {
+                t.Transactions(TransportTransactionMode.SendsAtomicWithReceive);
+            });
+
+            sqlInterface.UseSubscriptionPersistence(new SqlSubscriptionStorage(() => new SqlConnection(sqlConnectionString), "SenderRouter", new SqlDialect.MsSqlServer(), null));
+            sqlInterface.EnableDeduplication(linkInterface.Name, "Receiver.Router", () => new SqlConnection(sqlConnectionString), epochSize);
+
             var routingProtocol = routerConfig.UseStaticRoutingProtocol();
             routingProtocol.AddForwardRoute("SQL", "Rabbit", "Receiver.Router");
-
-            if (deduplication)
-            {
-                routerConfig.EnableDeduplication(d =>
-                {
-#pragma warning disable 618
-                    d.EnableInstaller(true);
-#pragma warning restore 618
-                    d.EpochSize(epochSize);
-                    d.ConnectionFactory(() => new SqlConnection(sqlConnectionString));
-                    d.AddOutgoingLink("Rabbit", "Receiver.Router");
-                });
-            }
 
             var router = Router.Create(routerConfig);
 

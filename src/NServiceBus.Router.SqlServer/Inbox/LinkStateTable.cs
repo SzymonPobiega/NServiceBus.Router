@@ -123,7 +123,7 @@ CREATE TABLE [dbo].[Inbox_LinkState_{destinationKey}](
     [TailLo] [bigint] NOT NULL,
     [TailHi] [bigint] NOT NULL,
     [TailTable] [varchar](500) NULL,
-CONSTRAINT [PK_Outbox_LinkState_{destinationKey}] PRIMARY KEY CLUSTERED 
+CONSTRAINT [PK_Inbox_LinkState_{destinationKey}] PRIMARY KEY CLUSTERED 
 (
 	[Source] ASC
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]

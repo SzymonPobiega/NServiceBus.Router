@@ -19,6 +19,12 @@ namespace NServiceBus.Router
                 throw new Exception("Routing protocol must be configured.");
             }
 
+            foreach (var featureType in config.Features)
+            {
+                var feature = (IFeature)Activator.CreateInstance(featureType);
+                feature.Configure(config);
+            }
+
             var interfaces = config.InterfaceFactories.Select(x => x()).ToArray();
 
             var chains = config.Chains;
@@ -85,7 +91,7 @@ namespace NServiceBus.Router
             chains.AddRule(_ => new ForwardPublishTerminator());
             chains.AddRule(_ => new ForwardReplyTerminator());
 
-            return new RouterImpl(config.Name, interfaces, config.Modules.ToArray(), config.RoutingProtocol, chains);
+            return new RouterImpl(config.Name, interfaces, config.Modules.ToArray(), config.RoutingProtocol, chains, config.Settings);
         }
     }
 }

@@ -22,6 +22,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\NServiceBus.Router.Connector\NServiceBus.Router.Connector.csproj" />
+    <ProjectReference Include="..\NServiceBus.Router.SqlServer\NServiceBus.Router.SqlServer.csproj" />
     <ProjectReference Include="..\NServiceBus.Router\NServiceBus.Router.csproj" />
   </ItemGroup>
 </Project>

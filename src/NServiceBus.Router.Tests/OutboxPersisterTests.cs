@@ -218,8 +218,8 @@ public class OutboxPersisterTests
             Assert.AreEqual(3, linkState.TailSession.Lo);
             Assert.AreEqual(9, linkState.HeadSession.Hi);
 
-            var plug = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterHeaders.Plug));
-            Assert.AreEqual("1", plug.Headers[RouterHeaders.SequenceNumber]);
+            var plug = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterDeduplicationHeaders.Plug));
+            Assert.AreEqual("1", plug.Headers[RouterDeduplicationHeaders.SequenceNumber]);
         }
     }
 
@@ -247,8 +247,8 @@ public class OutboxPersisterTests
             Assert.AreEqual(9, linkState.HeadSession.Hi);
 
             var plugsSequenceNumbers = dispatchedMessages
-                .Where(m => m.Headers.ContainsKey(RouterHeaders.Plug))
-                .Select(m => m.Headers[RouterHeaders.SequenceNumber])
+                .Where(m => m.Headers.ContainsKey(RouterDeduplicationHeaders.Plug))
+                .Select(m => m.Headers[RouterDeduplicationHeaders.SequenceNumber])
                 .ToArray();
 
             CollectionAssert.AreEqual(new[] { "1", "2" }, plugsSequenceNumbers);
@@ -281,8 +281,8 @@ public class OutboxPersisterTests
             Assert.AreEqual(3, linkState.TailSession.Lo);
             Assert.AreEqual(9, linkState.HeadSession.Hi);
 
-            var plug = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterHeaders.Plug));
-            Assert.AreEqual("0", plug.Headers[RouterHeaders.SequenceNumber]);
+            var plug = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterDeduplicationHeaders.Plug));
+            Assert.AreEqual("0", plug.Headers[RouterDeduplicationHeaders.SequenceNumber]);
         }
     }
 
@@ -310,8 +310,8 @@ public class OutboxPersisterTests
             Assert.AreEqual(3, linkState.TailSession.Lo);
             Assert.AreEqual(9, linkState.HeadSession.Hi);
 
-            var plug = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterHeaders.Plug));
-            Assert.AreEqual("2", plug.Headers[RouterHeaders.SequenceNumber]);
+            var plug = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterDeduplicationHeaders.Plug));
+            Assert.AreEqual("2", plug.Headers[RouterDeduplicationHeaders.SequenceNumber]);
         }
     }
 
@@ -337,8 +337,8 @@ public class OutboxPersisterTests
             Assert.AreEqual(9, linkState.HeadSession.Hi);
 
             var plugsSequenceNumbers = dispatchedMessages
-                .Where(m => m.Headers.ContainsKey(RouterHeaders.Plug))
-                .Select(m => m.Headers[RouterHeaders.SequenceNumber])
+                .Where(m => m.Headers.ContainsKey(RouterDeduplicationHeaders.Plug))
+                .Select(m => m.Headers[RouterDeduplicationHeaders.SequenceNumber])
                 .ToArray();
 
             CollectionAssert.AreEqual(new[] { "0", "1", "2" }, plugsSequenceNumbers);
@@ -366,11 +366,11 @@ public class OutboxPersisterTests
             Assert.AreEqual(6, linkState.HeadSession.Lo);
             Assert.AreEqual(9, linkState.HeadSession.Hi);
 
-            var advanceMessage = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterHeaders.Advance));
+            var advanceMessage = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterDeduplicationHeaders.Advance));
 
-            Assert.AreEqual("2", advanceMessage.Headers[RouterHeaders.AdvanceEpoch]);
-            Assert.AreEqual("6", advanceMessage.Headers[RouterHeaders.AdvanceHeadLo]);
-            Assert.AreEqual("9", advanceMessage.Headers[RouterHeaders.AdvanceHeadHi]);
+            Assert.AreEqual("2", advanceMessage.Headers[RouterDeduplicationHeaders.AdvanceEpoch]);
+            Assert.AreEqual("6", advanceMessage.Headers[RouterDeduplicationHeaders.AdvanceHeadLo]);
+            Assert.AreEqual("9", advanceMessage.Headers[RouterDeduplicationHeaders.AdvanceHeadHi]);
         }
     }
 
@@ -395,7 +395,7 @@ public class OutboxPersisterTests
             {
                 await persister.TryAdvance(op =>
                 {
-                    if (op.Headers.ContainsKey(RouterHeaders.Advance))
+                    if (op.Headers.ContainsKey(RouterDeduplicationHeaders.Advance))
                     {
                         throw new Exception("Simulated");
                     }
@@ -414,11 +414,11 @@ public class OutboxPersisterTests
             Assert.AreEqual(6, linkState.HeadSession.Lo);
             Assert.AreEqual(9, linkState.HeadSession.Hi);
 
-            var advanceMessage = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterHeaders.Advance));
+            var advanceMessage = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterDeduplicationHeaders.Advance));
 
-            Assert.AreEqual("2", advanceMessage.Headers[RouterHeaders.AdvanceEpoch]);
-            Assert.AreEqual("6", advanceMessage.Headers[RouterHeaders.AdvanceHeadLo]);
-            Assert.AreEqual("9", advanceMessage.Headers[RouterHeaders.AdvanceHeadHi]);
+            Assert.AreEqual("2", advanceMessage.Headers[RouterDeduplicationHeaders.AdvanceEpoch]);
+            Assert.AreEqual("6", advanceMessage.Headers[RouterDeduplicationHeaders.AdvanceHeadLo]);
+            Assert.AreEqual("9", advanceMessage.Headers[RouterDeduplicationHeaders.AdvanceHeadHi]);
         }
     }
 
@@ -443,7 +443,7 @@ public class OutboxPersisterTests
             {
                 await persister.TryAdvance(op =>
                 {
-                    if (op.Headers.ContainsKey(RouterHeaders.Advance))
+                    if (op.Headers.ContainsKey(RouterDeduplicationHeaders.Advance))
                     {
                         throw new Exception("Simulated");
                     }
@@ -460,11 +460,11 @@ public class OutboxPersisterTests
             var newPersister = new OutboxPersister(3, "S", "D");
             await newPersister.Initialize(Dispatch, conn);
 
-            var advanceMessage = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterHeaders.Advance));
+            var advanceMessage = dispatchedMessages.Single(m => m.Headers.ContainsKey(RouterDeduplicationHeaders.Advance));
 
-            Assert.AreEqual("2", advanceMessage.Headers[RouterHeaders.AdvanceEpoch]);
-            Assert.AreEqual("6", advanceMessage.Headers[RouterHeaders.AdvanceHeadLo]);
-            Assert.AreEqual("9", advanceMessage.Headers[RouterHeaders.AdvanceHeadHi]);
+            Assert.AreEqual("2", advanceMessage.Headers[RouterDeduplicationHeaders.AdvanceEpoch]);
+            Assert.AreEqual("6", advanceMessage.Headers[RouterDeduplicationHeaders.AdvanceHeadLo]);
+            Assert.AreEqual("9", advanceMessage.Headers[RouterDeduplicationHeaders.AdvanceHeadHi]);
         }
     }
 

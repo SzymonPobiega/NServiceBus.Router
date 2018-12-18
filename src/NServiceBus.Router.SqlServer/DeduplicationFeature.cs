@@ -1,24 +1,15 @@
 ﻿namespace NServiceBus.Router
 {
-    using System;
     using Deduplication;
     using Deduplication.Inbox;
     using Deduplication.Outbox;
 
-    /// <summary>
-    /// Configures message deduplication based on sequence numbers.
-    /// </summary>
-    public static class DeduplicationExtensions
+    class DeduplicationFeature : IFeature
     {
-        /// <summary>
-        /// Configures message deduplication based on sequence numbers.
-        /// </summary>
-        /// <returns></returns>
-        public static DeduplicationSettings EnableDeduplication(this RouterConfiguration routerConfig, Action<DeduplicationSettings> configAction)
+        public void Configure(RouterConfiguration routerConfig)
         {
-            var settings = new DeduplicationSettings();
+            var settings = routerConfig.Settings.Get<DeduplicationSettings>();
 
-            configAction(settings);
             var inboxDestinationKey = routerConfig.Name;
             var outboxSourceKey = routerConfig.Name;
 
@@ -28,22 +19,20 @@
             var outboxInstaller = new OutboxInstaller(outboxSourceKey);
             var outboxPersisterCollection = new OutboxPersisterCollection(outboxSourceKey, settings);
 
-            var dispatcher = new Dispatcher(settings, settings.ConnFactory);
+            var dispatcher = new Dispatcher(settings);
 
             if (settings.RunInstaller)
             {
-                routerConfig.Modules.Add(new Installer(settings, outboxInstaller, inboxInstaller));
+                routerConfig.AddModule(new Installer(settings, outboxInstaller, inboxInstaller));
             }
 
-            routerConfig.Modules.Add(dispatcher);
-            routerConfig.Modules.Add(outboxPersisterCollection);
-            routerConfig.Modules.Add(inboxPersisterCollection);
+            routerConfig.AddModule(dispatcher);
+            routerConfig.AddModule(outboxPersisterCollection);
+            routerConfig.AddModule(inboxPersisterCollection);
 
             routerConfig.AddRule(_ => new CaptureOutgoingMessageRule(settings));
             routerConfig.AddRule(_ => new OutboxRule(outboxPersisterCollection, dispatcher));
             routerConfig.AddRule(_ => new InboxRule(inboxPersisterCollection, settings));
-
-            return settings;
         }
     }
 }

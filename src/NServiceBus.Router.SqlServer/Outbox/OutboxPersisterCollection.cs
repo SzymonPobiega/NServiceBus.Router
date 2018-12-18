@@ -5,6 +5,7 @@
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
+    using Settings;
     using Transport;
 
     class OutboxPersisterCollection : IModule
@@ -15,9 +16,9 @@
 
         public OutboxPersisterCollection(string sourceKey, DeduplicationSettings settings)
         {
-            persisters = settings.GetAllDestinations().ToDictionary(d => d, 
-                d => new OutboxPersisterRunner(new OutboxPersister(settings.EpochSizeValue, sourceKey, d), settings.ConnFactory));
-            destinationToInterfaceMap = settings.GetAllDestinations().ToDictionary(d => d, d => settings.GetDestinationInterface(d));
+            persisters = settings.Links.ToDictionary(x => x.Key, 
+                x => new OutboxPersisterRunner(new OutboxPersister(x.Value.EpochSize, sourceKey, x.Key), x.Value.ConnectionFactory));
+            destinationToInterfaceMap = settings.Links.ToDictionary(x => x.Key, x => x.Value.LinkInterface);
         }
 
         public Task Store(CapturedTransportOperation operation, SqlConnection conn, SqlTransaction trans)
@@ -25,7 +26,7 @@
             return persisters[operation.Destination].Store(operation, conn, trans);
         }
 
-        public async Task Start(RootContext rootContext)
+        public async Task Start(RootContext rootContext, SettingsHolder extensibilitySettings)
         {
             tokenSource = new CancellationTokenSource();
 

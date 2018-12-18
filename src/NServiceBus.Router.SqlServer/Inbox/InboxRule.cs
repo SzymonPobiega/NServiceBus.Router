@@ -8,14 +8,12 @@
 
     class InboxRule : IRule<RawContext, RawContext>
     {
-        Func<SqlConnection> connectionFactory;
         DeduplicationSettings settings;
         InboxPersisterCollection persisterCollection;
 
         public InboxRule(InboxPersisterCollection persisterCollection, DeduplicationSettings settings)
         {
             this.persisterCollection = persisterCollection;
-            connectionFactory = settings.ConnFactory;
             this.settings = settings;
         }
 
@@ -36,23 +34,23 @@
 
         public Task Invoke(RawContext context, Func<RawContext, Task> next)
         {
-            if (!settings.IsInboxEnabledFor(context.Interface))
+            if (!settings.IsDeduplicationEnabledFor(context.Interface))
             {
                 return next(context);
             }
 
-            if (!context.Headers.TryGetValue(RouterHeaders.SequenceKey, out var seqKey))
+            if (!context.Headers.TryGetValue(RouterDeduplicationHeaders.SequenceKey, out var seqKey))
             {
                 return next(context);
             }
 
-            if (!settings.IsInboxEnabledFor(context.Interface, seqKey))
+            if (!settings.IsDeduplicationEnabledFor(context.Interface, seqKey))
             {
                 throw new UnforwardableMessageException($"Deduplication is not enabled for source {seqKey} via interface {context.Interface}");
             }
 
-            var isInitialize = context.Headers.ContainsKey(RouterHeaders.Initialize);
-            var isAdvance = context.Headers.ContainsKey(RouterHeaders.Advance);
+            var isInitialize = context.Headers.ContainsKey(RouterDeduplicationHeaders.Initialize);
+            var isAdvance = context.Headers.ContainsKey(RouterDeduplicationHeaders.Advance);
 
             if (isInitialize)
             {
@@ -63,19 +61,19 @@
                 return ProcessAdvanceMessage(context, seqKey);
             }
 
-            var seq = GetInt64Header(context.Headers, RouterHeaders.SequenceNumber);
+            var seq = GetInt64Header(context.Headers, RouterDeduplicationHeaders.SequenceNumber);
             return ProcessRegularMessage(context, next, seqKey, seq);
         }
 
         async Task ProcessInitializeMessage(RawContext context, string seqKey)
         {
-            using (var conn = connectionFactory())
+            using (var conn = settings.Links[seqKey].ConnectionFactory())
             {
                 await conn.OpenAsync().ConfigureAwait(false);
-                var headLo = GetInt64Header(context.Headers, RouterHeaders.InitializeHeadLo);
-                var headHi = GetInt64Header(context.Headers, RouterHeaders.InitializeHeadHi);
-                var tailLo = GetInt64Header(context.Headers, RouterHeaders.InitializeTailLo);
-                var tailHi = GetInt64Header(context.Headers, RouterHeaders.InitializeTailHi);
+                var headLo = GetInt64Header(context.Headers, RouterDeduplicationHeaders.InitializeHeadLo);
+                var headHi = GetInt64Header(context.Headers, RouterDeduplicationHeaders.InitializeHeadHi);
+                var tailLo = GetInt64Header(context.Headers, RouterDeduplicationHeaders.InitializeTailLo);
+                var tailHi = GetInt64Header(context.Headers, RouterDeduplicationHeaders.InitializeTailHi);
 
                 await persisterCollection.Initialize(seqKey, headLo, headHi, tailLo, tailHi, conn).ConfigureAwait(false);
             }
@@ -83,12 +81,12 @@
 
         async Task ProcessAdvanceMessage(RawContext context, string seqKey)
         {
-            using (var conn = connectionFactory())
+            using (var conn = settings.Links[seqKey].ConnectionFactory())
             {
                 await conn.OpenAsync().ConfigureAwait(false);
-                var nextEpoch = GetInt64Header(context.Headers, RouterHeaders.AdvanceEpoch);
-                var nextLo = GetInt64Header(context.Headers, RouterHeaders.AdvanceHeadLo);
-                var nextHi = GetInt64Header(context.Headers, RouterHeaders.AdvanceHeadHi);
+                var nextEpoch = GetInt64Header(context.Headers, RouterDeduplicationHeaders.AdvanceEpoch);
+                var nextLo = GetInt64Header(context.Headers, RouterDeduplicationHeaders.AdvanceHeadLo);
+                var nextHi = GetInt64Header(context.Headers, RouterDeduplicationHeaders.AdvanceHeadHi);
 
                 await persisterCollection.Advance(seqKey, nextEpoch, nextLo, nextHi, conn).ConfigureAwait(false);
             }
@@ -96,7 +94,7 @@
 
         async Task ProcessRegularMessage(RawContext context, Func<RawContext, Task> next, string seqKey, long seq)
         {
-            using (var conn = connectionFactory())
+            using (var conn = settings.Links[seqKey].ConnectionFactory())
             {
                 await conn.OpenAsync().ConfigureAwait(false);
                 using (var trans = conn.BeginTransaction())
@@ -109,7 +107,7 @@
                         return;
                     }
 
-                    var isPlug = context.Headers.ContainsKey(RouterHeaders.Plug);
+                    var isPlug = context.Headers.ContainsKey(RouterDeduplicationHeaders.Plug);
                     if (!isPlug) //If message is only a plug we don't forward it
                     {
                         await Forward(context, next, conn, trans);

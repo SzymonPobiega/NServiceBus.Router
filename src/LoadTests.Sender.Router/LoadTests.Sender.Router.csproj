@@ -14,6 +14,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\NServiceBus.Router.SqlServer\NServiceBus.Router.SqlServer.csproj" />
     <ProjectReference Include="..\NServiceBus.Router\NServiceBus.Router.csproj" />
     <PackageReference Include="NServiceBus.SqlServer" Version="[4.1.0, 5.0.0)" />
     <PackageReference Include="NServiceBus.RabbitMQ" Version="[5.0.0, 6.0.0)" />

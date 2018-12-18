@@ -3,15 +3,17 @@ using System.Linq;
 using System.Threading.Tasks;
 using NServiceBus.Logging;
 using NServiceBus.Router;
+using NServiceBus.Settings;
 
 class RouterImpl : IRouter
 {
-    public RouterImpl(string name, Interface[] interfaces, IModule[] modules, IRoutingProtocol routingProtocol, InterfaceChains interfaceChains)
+    public RouterImpl(string name, Interface[] interfaces, IModule[] modules, IRoutingProtocol routingProtocol, InterfaceChains interfaceChains, SettingsHolder extensibilitySettings)
     {
         this.name = name;
         this.modules = modules;
         this.routingProtocol = routingProtocol;
         this.interfaceChains = interfaceChains;
+        this.extensibilitySettings = extensibilitySettings;
         this.interfaces = interfaces.ToDictionary(x => x.Name, x => x);
     }
 
@@ -30,7 +32,7 @@ class RouterImpl : IRouter
         foreach (var module in modules)
         {
             log.Debug($"Starting module {module}");
-            await module.Start(rootContext).ConfigureAwait(false);
+            await module.Start(rootContext, extensibilitySettings).ConfigureAwait(false);
             log.Debug($"Started module {module}");
         }
 
@@ -57,6 +59,7 @@ class RouterImpl : IRouter
     IModule[] modules;
     IRoutingProtocol routingProtocol;
     InterfaceChains interfaceChains;
+    SettingsHolder extensibilitySettings;
     Dictionary<string, Interface> interfaces;
     static ILog log = LogManager.GetLogger<RouterImpl>();
 }

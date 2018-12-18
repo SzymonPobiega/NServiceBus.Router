@@ -17,7 +17,7 @@ public class InboxPersisterTests
         LogManager.Use<DefaultFactory>().Level(LogLevel.Debug);
 
         installer = new InboxInstaller("D");
-        persister = new InboxPersister("S", "D");
+        persister = new InboxPersister("S", "D", CreateConnection);
         using (var conn = CreateConnection())
         {
             await conn.OpenAsync().ConfigureAwait(false);
@@ -29,7 +29,7 @@ public class InboxPersisterTests
                 trans.Commit();
             }
 
-            await persister.Prepare(conn).ConfigureAwait(false);
+            await persister.Prepare().ConfigureAwait(false);
         }
     }
 
@@ -73,7 +73,7 @@ public class InboxPersisterTests
             }
             catch (ProcessCurrentMessageLaterException e)
             {
-                StringAssert.StartsWith("Inbox table Inbox_S_D_2 seems to have holes in the sequence.", e.Message);
+                StringAssert.StartsWith("Inbox table Inbox_S_D_Right seems to have holes in the sequence.", e.Message);
             }
         }
     }
@@ -196,8 +196,8 @@ public class InboxPersisterTests
 
             await persister.Initialize(3, 6, 0, 3, conn).ConfigureAwait(false);
 
-            var slowPersister = new InboxPersister("S", "D");
-            await slowPersister.Prepare(conn);
+            var slowPersister = new InboxPersister("S", "D", CreateConnection);
+            await slowPersister.Prepare();
 
             await persister.Deduplicate("M1", 0, conn, null).ConfigureAwait(false);
             await persister.Deduplicate("M2", 1, conn, null).ConfigureAwait(false);
@@ -220,8 +220,8 @@ public class InboxPersisterTests
 
             await persister.Initialize(3, 6, 0, 3, conn).ConfigureAwait(false);
 
-            var slowPersister = new InboxPersister("S", "D");
-            await slowPersister.Prepare(conn);
+            var slowPersister = new InboxPersister("S", "D", CreateConnection);
+            await slowPersister.Prepare();
 
             await persister.Deduplicate("M1", 0, conn, null).ConfigureAwait(false);
             await persister.Deduplicate("M2", 1, conn, null).ConfigureAwait(false);
@@ -246,8 +246,8 @@ public class InboxPersisterTests
 
             await persister.Initialize(3, 6, 0, 3, conn).ConfigureAwait(false);
 
-            var slowPersister = new InboxPersister("S", "D");
-            await slowPersister.Prepare(conn);
+            var slowPersister = new InboxPersister("S", "D", CreateConnection);
+            await slowPersister.Prepare();
 
             await persister.Deduplicate("M0", 0, conn, null).ConfigureAwait(false);
             await persister.Deduplicate("M0", 1, conn, null).ConfigureAwait(false);

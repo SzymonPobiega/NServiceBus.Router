@@ -58,7 +58,7 @@ class Program
         routingProtocol.AddForwardRoute("SQL", "Rabbit");
         routingProtocol.AddForwardRoute("Rabbit", "SQL");
 
-        routerConfig.EnableDeduplication(d =>
+        routerConfig.ConfigureDeduplication(d =>
         {
             d.EpochSize(1000);
             d.ConnectionFactory(() => new SqlConnection(ConnectionString));

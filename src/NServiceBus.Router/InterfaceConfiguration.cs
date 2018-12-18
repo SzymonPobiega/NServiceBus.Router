@@ -3,6 +3,7 @@
     using System;
     using Raw;
     using Routing;
+    using Settings;
     using Transport;
     using Unicast.Subscriptions.MessageDrivenSubscriptions;
 
@@ -13,17 +14,37 @@
     public class InterfaceConfiguration<T>
         where T : TransportDefinition, new()
     {
-        string Name;
         Action<TransportExtensions<T>> customization;
+        Action<Type> enableFeature;
         bool? autoCreateQueues;
         string autoCreateQueuesIdentity;
         int? maximumConcurrency;
         ISubscriptionStorage subscriptionStorage;
 
-        internal InterfaceConfiguration(string name, Action<TransportExtensions<T>> customization)
+        /// <summary>
+        /// Router's extensibility settings.
+        /// </summary>
+        public SettingsHolder Settings { get; }
+
+        /// <summary>
+        /// Name of the interface.
+        /// </summary>
+        public string Name { get; }
+
+        internal InterfaceConfiguration(string name, Action<TransportExtensions<T>> customization, SettingsHolder settings, Action<Type> enableFeature)
         {
             Name = name;
+            Settings = settings;
             this.customization = customization;
+            this.enableFeature = enableFeature;
+        }
+
+        /// <summary>
+        /// Adds a feature.
+        /// </summary>
+        public void EnableFeature(Type featureType)
+        {
+            enableFeature(featureType);
         }
 
         /// <summary>

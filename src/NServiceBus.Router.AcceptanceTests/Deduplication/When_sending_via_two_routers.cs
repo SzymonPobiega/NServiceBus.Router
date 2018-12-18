@@ -22,23 +22,19 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
             await Scenario.Define<Context>()
                 .WithRouter("Green-Blue", cfg =>
                 {
-                    cfg.EnableDeduplication(c =>
-                    {
-                        c.ConnectionFactory(() => new SqlConnection(ConnectionString));
-                        c.AddOutgoingLink("Blue", "Red-Blue");
-                        c.AddIncomingLink("Blue", "Red-Blue");
-                        c.EpochSize(10);
+                    var deduplicationConfig = cfg.ConfigureDeduplication();
 #pragma warning disable 618
-                        c.EnableInstaller(true);
+                    deduplicationConfig.EnableInstaller(true);
 #pragma warning restore 618
-                    });
+                    var linkInterface = cfg.AddInterface<TestTransport>("Blue", t => t.BrokerBravo()).InMemorySubscriptions();
 
-                    cfg.AddInterface<SqlServerTransport>("Green", t =>
+                    var sqlInterface = cfg.AddInterface<SqlServerTransport>("Green", t =>
                     {
                         t.ConnectionString(ConnectionString);
                         t.Transactions(TransportTransactionMode.SendsAtomicWithReceive);
-                    }).InMemorySubscriptions();
-                    cfg.AddInterface<TestTransport>("Blue", t => t.BrokerBravo()).InMemorySubscriptions();
+                    });
+                    sqlInterface.InMemorySubscriptions();
+                    sqlInterface.EnableDeduplication(linkInterface.Name, "Red-Blue", () => new SqlConnection(ConnectionString), 10);
 
                     var routeTable = cfg.UseStaticRoutingProtocol();
                     routeTable.AddForwardRoute("Blue", "Green");
@@ -46,24 +42,20 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
                 })
                 .WithRouter("Red-Blue", cfg =>
                 {
-                    cfg.EnableDeduplication(c =>
-                    {
-                        c.ConnectionFactory(() => new SqlConnection(ConnectionString));
-                        c.AddIncomingLink("Blue", "Green-Blue");
-                        c.AddOutgoingLink("Blue", "Green-Blue");
-
-                        c.EpochSize(5);
+                    var deduplicationConfig = cfg.ConfigureDeduplication();
 #pragma warning disable 618
-                        c.EnableInstaller(true);
+                    deduplicationConfig.EnableInstaller(true);
 #pragma warning restore 618
-                    });
 
-                    cfg.AddInterface<TestTransport>("Blue", t => t.BrokerBravo()).InMemorySubscriptions();
-                    cfg.AddInterface<SqlServerTransport>("Red", t =>
+                    var linkInterface = cfg.AddInterface<TestTransport>("Blue", t => t.BrokerBravo()).InMemorySubscriptions();
+
+                    var sqlInterface = cfg.AddInterface<SqlServerTransport>("Red", t =>
                     {
                         t.ConnectionString(ConnectionString);
                         t.Transactions(TransportTransactionMode.SendsAtomicWithReceive);
-                    }).InMemorySubscriptions();
+                    });
+                    sqlInterface.InMemorySubscriptions();
+                    sqlInterface.EnableDeduplication(linkInterface.Name, "Green-Blue", () => new SqlConnection(ConnectionString), 5);
 
                     var routeTable = cfg.UseStaticRoutingProtocol();
                     routeTable.AddForwardRoute("Blue", "Red");

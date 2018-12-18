@@ -17,7 +17,10 @@
             Interface = @interface ?? parentContext.Interface ?? throw new Exception("Interface is required.");
         }
 
-        internal RuleContext(RootContext parentContext, string @interface)
+        /// <summary>
+        /// Creates new instance.
+        /// </summary>
+        protected internal RuleContext(RootContext parentContext, string @interface)
             : base(parentContext?.Extensions)
         {
             Interface = @interface;

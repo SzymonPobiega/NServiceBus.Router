@@ -20,12 +20,12 @@
 
         public async Task Invoke(RawContext context, Func<RawContext, Task> next)
         {
-            var capturedMessages = new List<CapturedTransportOperation>();
+            var capturedMessages = new CapturedTransportOperations(context.IncomingInterface);
             context.Set(capturedMessages);
 
             await next(context).ConfigureAwait(false);
 
-            context.Remove<List<CapturedTransportOperation>>();
+            context.Remove<CapturedTransportOperations>();
 
             if (!capturedMessages.Any())
             {
@@ -48,7 +48,7 @@
             }
         }
 
-        async Task Store(List<CapturedTransportOperation> capturedMessages, SqlConnection connection, SqlTransaction transaction)
+        async Task Store(IEnumerable<CapturedTransportOperation> capturedMessages, SqlConnection connection, SqlTransaction transaction)
         {
             foreach (var op in capturedMessages)
             {

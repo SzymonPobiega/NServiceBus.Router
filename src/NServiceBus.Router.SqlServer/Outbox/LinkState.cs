@@ -52,11 +52,11 @@
 
             var headers = new Dictionary<string, string>
             {
-                [RouterHeaders.SequenceKey] = sourceKey,
-                [RouterHeaders.Advance] = "true",
-                [RouterHeaders.AdvanceEpoch] = Epoch.ToString(),
-                [RouterHeaders.AdvanceHeadLo] = HeadSession.Lo.ToString(),
-                [RouterHeaders.AdvanceHeadHi] = HeadSession.Hi.ToString(),
+                [RouterDeduplicationHeaders.SequenceKey] = sourceKey,
+                [RouterDeduplicationHeaders.Advance] = "true",
+                [RouterDeduplicationHeaders.AdvanceEpoch] = Epoch.ToString(),
+                [RouterDeduplicationHeaders.AdvanceHeadLo] = HeadSession.Lo.ToString(),
+                [RouterDeduplicationHeaders.AdvanceHeadHi] = HeadSession.Hi.ToString(),
             };
 
             var message = new OutgoingMessage(Guid.NewGuid().ToString(), headers, new byte[0]);
@@ -69,12 +69,12 @@
 
             var headers = new Dictionary<string, string>
             {
-                [RouterHeaders.SequenceKey] = sourceKey,
-                [RouterHeaders.Initialize] = "true",
-                [RouterHeaders.InitializeHeadLo] = HeadSession.Lo.ToString(),
-                [RouterHeaders.InitializeHeadHi] = HeadSession.Hi.ToString(),
-                [RouterHeaders.InitializeTailLo] = TailSession.Lo.ToString(),
-                [RouterHeaders.InitializeTailHi] = TailSession.Hi.ToString()
+                [RouterDeduplicationHeaders.SequenceKey] = sourceKey,
+                [RouterDeduplicationHeaders.Initialize] = "true",
+                [RouterDeduplicationHeaders.InitializeHeadLo] = HeadSession.Lo.ToString(),
+                [RouterDeduplicationHeaders.InitializeHeadHi] = HeadSession.Hi.ToString(),
+                [RouterDeduplicationHeaders.InitializeTailLo] = TailSession.Lo.ToString(),
+                [RouterDeduplicationHeaders.InitializeTailHi] = TailSession.Hi.ToString()
             };
 
             var message = new OutgoingMessage(Guid.NewGuid().ToString(), headers, new byte[0]);

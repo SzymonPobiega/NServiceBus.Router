@@ -1,5 +1,6 @@
 ﻿namespace NServiceBus.Router.Deduplication.Inbox
 {
+    using System;
     using System.Data.SqlClient;
     using System.Threading.Tasks;
     using Logging;
@@ -9,14 +10,16 @@
         static ILog log = LogManager.GetLogger<InboxPersister>();
         readonly string sourceKey;
         string destinationKey;
+        Func<SqlConnection> connectionFactory;
         LinkStateTable linkStateTable;
         volatile LinkState linkState;
 
-        public InboxPersister(string sourceKey, string destinationKey)
+        public InboxPersister(string sourceKey, string destinationKey, Func<SqlConnection> connectionFactory)
         {
             linkStateTable = new LinkStateTable(destinationKey);
             this.sourceKey = sourceKey;
             this.destinationKey = destinationKey;
+            this.connectionFactory = connectionFactory;
         }
 
         public async Task<DeduplicationResult> Deduplicate(string messageId, long seq, SqlConnection conn, SqlTransaction trans)
@@ -84,9 +87,13 @@
             }
         }
 
-        public async Task Prepare(SqlConnection conn)
+        public async Task Prepare()
         {
-            linkState = await linkStateTable.Get(sourceKey, conn).ConfigureAwait(false);
+            using (var conn = connectionFactory())
+            {
+                await conn.OpenAsync().ConfigureAwait(false);
+                linkState = await linkStateTable.Get(sourceKey, conn).ConfigureAwait(false);
+            }
         }
 
         public async Task Initialize(long headLo, long headHi, long tailLo, long tailHi, SqlConnection conn)

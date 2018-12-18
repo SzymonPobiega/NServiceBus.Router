@@ -12,11 +12,12 @@
     <PackageReference Include="NUnit" Version="3.7.*" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net461'">
-    <PackageReference Include="NServiceBus.Azure.Transports.WindowsAzureServiceBus" Version="8.0.0-*" />
+    <PackageReference Include="NServiceBus.Azure.Transports.WindowsAzureServiceBus" Version="9.1.0-*" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\AcceptanceTesting\AcceptanceTesting.csproj" />
     <ProjectReference Include="..\NServiceBus.Router.Connector\NServiceBus.Router.Connector.csproj" />
+    <ProjectReference Include="..\NServiceBus.Router.SqlServer\NServiceBus.Router.SqlServer.csproj" />
     <ProjectReference Include="..\NServiceBus.Router\NServiceBus.Router.csproj" />
   </ItemGroup>
 </Project>

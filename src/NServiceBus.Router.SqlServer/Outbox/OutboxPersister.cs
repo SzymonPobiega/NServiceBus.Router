@@ -58,8 +58,8 @@
 
             try
             {
-                operation.OutgoingMessage.Headers[RouterHeaders.SequenceNumber] = seq.ToString();
-                operation.OutgoingMessage.Headers[RouterHeaders.SequenceKey] = sourceKey;
+                operation.OutgoingMessage.Headers[RouterDeduplicationHeaders.SequenceNumber] = seq.ToString();
+                operation.OutgoingMessage.Headers[RouterDeduplicationHeaders.SequenceKey] = sourceKey;
                 operation.AssignTable(tableName);
                 operation.AssignSequence(seq);
 
@@ -248,7 +248,6 @@
 
         async Task<(bool, LinkState)> TryAdvanceEpochInDatabase(SqlConnection conn, string tableName, LinkState queriedLinkState)
         {
-
             log.Debug($"Closing outbox table {tableName}.");
             using (var advanceTransaction = conn.BeginTransaction())
             {
@@ -285,9 +284,9 @@
         {
             var headers = new Dictionary<string, string>
             {
-                [RouterHeaders.SequenceNumber] = seq.ToString(),
-                [RouterHeaders.SequenceKey] = sourceKey,
-                [RouterHeaders.Plug] = "true"
+                [RouterDeduplicationHeaders.SequenceNumber] = seq.ToString(),
+                [RouterDeduplicationHeaders.SequenceKey] = sourceKey,
+                [RouterDeduplicationHeaders.Plug] = "true"
             };
             var message = new OutgoingMessage(Guid.NewGuid().ToString(), headers, new byte[0]);
             return message;

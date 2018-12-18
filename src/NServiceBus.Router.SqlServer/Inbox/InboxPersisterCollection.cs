@@ -1,20 +1,18 @@
 ﻿namespace NServiceBus.Router.Deduplication.Inbox
 {
-    using System;
     using System.Collections.Generic;
     using System.Data.SqlClient;
     using System.Linq;
     using System.Threading.Tasks;
+    using Settings;
 
     class InboxPersisterCollection : IModule
     {
         Dictionary<string, InboxPersister> persisters;
-        Func<SqlConnection> connectionFactory;
 
         public InboxPersisterCollection(string destinationKey, DeduplicationSettings settings)
         {
-            persisters = settings.GetAllSources().ToDictionary(s => s, s => new InboxPersister(s, destinationKey));
-            connectionFactory = settings.ConnFactory;
+            persisters = settings.Links.ToDictionary(x => x.Key, x => new InboxPersister(x.Key, destinationKey, x.Value.ConnectionFactory));
         }
 
         public Task Initialize(string sourceKey, long headLo, long headHi, long tailLo, long tailHi, SqlConnection conn)
@@ -32,15 +30,11 @@
             return persisters[sourceKey].Advance(nextEpoch, nextLo, nextHi, conn);
         }
 
-        public async Task Start(RootContext rootContext)
+        public async Task Start(RootContext rootContext, SettingsHolder extensibilitySettings)
         {
-            using (var conn = connectionFactory())
+            foreach (var persister in persisters.Values)
             {
-                await conn.OpenAsync().ConfigureAwait(false);
-                foreach (var persister in persisters.Values)
-                {
-                    await persister.Prepare(conn).ConfigureAwait(false);
-                }
+                await persister.Prepare().ConfigureAwait(false);
             }
         }
 

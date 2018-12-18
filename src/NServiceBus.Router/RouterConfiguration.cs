@@ -3,6 +3,7 @@ namespace NServiceBus.Router
     
     using System;
     using System.Collections.Generic;
+    using Settings;
     using Transport;
 
     /// <summary>
@@ -14,6 +15,11 @@ namespace NServiceBus.Router
         /// Router endpoint name.
         /// </summary>
         public string Name { get; }
+
+        /// <summary>
+        /// Router's extensibility settings.
+        /// </summary>
+        public SettingsHolder Settings { get; } = new SettingsHolder();
 
         /// <summary>
         /// Creates new router configuration with provided endpoint name.
@@ -33,7 +39,7 @@ namespace NServiceBus.Router
         public InterfaceConfiguration<T> AddInterface<T>(string name, Action<TransportExtensions<T>> customization) 
             where T : TransportDefinition, new()
         {
-            var ifaceConfig = new InterfaceConfiguration<T>(name, customization);
+            var ifaceConfig = new InterfaceConfiguration<T>(name, customization, Settings, EnableFeature);
             InterfaceFactories.Add(() => CreateInterface(ifaceConfig));
             return ifaceConfig;
         }
@@ -97,6 +103,14 @@ namespace NServiceBus.Router
         }
 
         /// <summary>
+        /// Adds a feature.
+        /// </summary>
+        public void EnableFeature(Type featureType)
+        {
+            Features.Add(featureType);
+        }
+
+        /// <summary>
         /// Defines a custom chain within the router.
         /// </summary>
         /// <typeparam name="TInput">Input type of the chain.</typeparam>
@@ -111,6 +125,7 @@ namespace NServiceBus.Router
         string autoCreateQueuesIdentity;
         internal List<Func<Interface>> InterfaceFactories = new List<Func<Interface>>();
         internal List<IModule> Modules = new List<IModule>();
+        internal HashSet<Type> Features = new HashSet<Type>();
         internal IRoutingProtocol RoutingProtocol;
         internal InterfaceChains Chains = new InterfaceChains();
         RuntimeTypeGenerator typeGenerator = new RuntimeTypeGenerator();

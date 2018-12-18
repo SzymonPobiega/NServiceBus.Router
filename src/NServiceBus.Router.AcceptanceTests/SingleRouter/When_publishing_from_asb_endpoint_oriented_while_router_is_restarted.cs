@@ -63,6 +63,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 settings.Set<NServiceBus.Conventions>(builder.Conventions);
 
                 var topology = t.UseEndpointOrientedTopology();
+                topology.EnableMigrationToForwardingTopology();
                 topology.RegisterPublisher(typeof(MyAsbEvent), Conventions.EndpointNamingConvention(typeof(Publisher)));
 
                 var serializer = Tuple.Create(new NewtonsoftSerializer() as SerializationDefinition, new SettingsHolder());
@@ -71,17 +72,6 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             leftIface.LimitMessageProcessingConcurrencyTo(1); //To ensure when tracer arrives the subscribe request has already been processed.;
             cfg.AddRule(_ => new SuppressTransactionScopeRule());
             cfg.UseStaticRoutingProtocol().AddForwardRoute("Left", "Right");
-
-            cfg.EnableResubscriber<AzureServiceBusTransport>("Right", TimeSpan.FromSeconds(5), t =>
-            {
-                var connString = Environment.GetEnvironmentVariable("AzureServiceBus.ConnectionString");
-                t.ConnectionString(connString);
-                t.UseEndpointOrientedTopology();
-
-                var settings = t.GetSettings();
-                var serializer = Tuple.Create(new NewtonsoftSerializer() as SerializationDefinition, new SettingsHolder());
-                settings.Set("MainSerializer", serializer);
-            });
         }
 
         class SuppressTransactionScopeRule : IRule<RawContext, RawContext>
