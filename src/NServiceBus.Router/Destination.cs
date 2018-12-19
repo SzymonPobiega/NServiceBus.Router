@@ -1,5 +1,7 @@
 namespace NServiceBus.Router
 {
+    using System;
+
     /// <summary>
     /// Route table destination
     /// </summary>
@@ -10,6 +12,10 @@ namespace NServiceBus.Router
         /// </summary>
         public Destination(string endpoint, string site)
         {
+            if (endpoint == null && site == null)
+            {
+                throw new ArgumentException("Either endpoint or site has to be specified.");
+            }
             Endpoint = endpoint;
             Site = site;
         }

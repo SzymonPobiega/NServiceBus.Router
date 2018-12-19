@@ -1,7 +1,9 @@
 namespace NServiceBus.Router
 {
+    
     using System;
     using System.Collections.Generic;
+    using Settings;
     using Transport;
 
     /// <summary>
@@ -13,6 +15,11 @@ namespace NServiceBus.Router
         /// Router endpoint name.
         /// </summary>
         public string Name { get; }
+
+        /// <summary>
+        /// Router's extensibility settings.
+        /// </summary>
+        public SettingsHolder Settings { get; } = new SettingsHolder();
 
         /// <summary>
         /// Creates new router configuration with provided endpoint name.
@@ -32,14 +39,14 @@ namespace NServiceBus.Router
         public InterfaceConfiguration<T> AddInterface<T>(string name, Action<TransportExtensions<T>> customization) 
             where T : TransportDefinition, new()
         {
-            var ifaceConfig = new InterfaceConfiguration<T>(name, customization);
-            PortFactories.Add(() => CreateInterface(ifaceConfig));
+            var ifaceConfig = new InterfaceConfiguration<T>(name, customization, Settings, EnableFeature);
+            InterfaceFactories.Add(() => CreateInterface(ifaceConfig));
             return ifaceConfig;
         }
 
         Interface CreateInterface<T>(InterfaceConfiguration<T> ifaceConfig) where T : TransportDefinition, new()
         {
-            return ifaceConfig.Create(Name, typeGenerator, "poison", autoCreateQueues, autoCreateQueuesIdentity, InterceptMethod, () => RoutingProtocol.RouteTable, ImmediateRetries, DelayedRetries, CircuitBreakerThreshold);
+            return ifaceConfig.Create(Name, "poison", autoCreateQueues, autoCreateQueuesIdentity, ImmediateRetries, DelayedRetries, CircuitBreakerThreshold, typeGenerator);
         }
 
         /// <summary>
@@ -68,15 +75,6 @@ namespace NServiceBus.Router
         public int CircuitBreakerThreshold { get; set; } = 5;
 
         /// <summary>
-        /// Configures the router to invoke a provided callback when processing messages.
-        /// </summary>
-        /// <param name="interceptMethod">Callback to be invoked.</param>
-        public void InterceptForwarding(InterceptMessageForwarding interceptMethod)
-        {
-            InterceptMethod = interceptMethod ?? throw new ArgumentNullException(nameof(interceptMethod));
-        }
-        
-        /// <summary>
         /// Configures the routing protocol.
         /// </summary>
         public void UseRoutingProtocol(IRoutingProtocol protocol)
@@ -84,11 +82,52 @@ namespace NServiceBus.Router
             RoutingProtocol = protocol;
         }
 
-        InterceptMessageForwarding InterceptMethod = (queue, message, dispatch, forward) => forward(dispatch);
+        /// <summary>
+        /// Adds a global (applicable to all interfaces) routing rule.
+        /// </summary>
+        /// <typeparam name="T">Type of the rule.</typeparam>
+        /// <param name="constructor">Delegate that constructs a new instance of the rule.</param>
+        /// <param name="condition">Condition which must be true for the rule to be added to the chain.</param>
+        public void AddRule<T>(Func<IRuleCreationContext, T> constructor, Func<IRuleCreationContext, bool> condition = null)
+            where T : IRule
+        {
+            Chains.AddRule(constructor, condition);
+        }
+
+        /// <summary>
+        /// Adds a module.
+        /// </summary>
+        public void AddModule(IModule module)
+        {
+            Modules.Add(module);
+        }
+
+        /// <summary>
+        /// Adds a feature.
+        /// </summary>
+        public void EnableFeature(Type featureType)
+        {
+            Features.Add(featureType);
+        }
+
+        /// <summary>
+        /// Defines a custom chain within the router.
+        /// </summary>
+        /// <typeparam name="TInput">Input type of the chain.</typeparam>
+        /// <param name="chainDefinition">Chain definition</param>
+        public void DefineChain<TInput>(Func<ChainBuilder, IChain<TInput>> chainDefinition) 
+            where TInput : IRuleContext
+        {
+            Chains.AddChain(chainDefinition);
+        }
+
         bool? autoCreateQueues;
         string autoCreateQueuesIdentity;
-        RuntimeTypeGenerator typeGenerator = new RuntimeTypeGenerator();
-        internal List<Func<Interface>> PortFactories = new List<Func<Interface>>();
+        internal List<Func<Interface>> InterfaceFactories = new List<Func<Interface>>();
+        internal List<IModule> Modules = new List<IModule>();
+        internal HashSet<Type> Features = new HashSet<Type>();
         internal IRoutingProtocol RoutingProtocol;
+        internal InterfaceChains Chains = new InterfaceChains();
+        RuntimeTypeGenerator typeGenerator = new RuntimeTypeGenerator();
     }
 }

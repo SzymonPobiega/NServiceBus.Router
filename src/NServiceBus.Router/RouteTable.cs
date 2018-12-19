@@ -4,7 +4,6 @@ namespace NServiceBus.Router
     using System.Collections.Generic;
     using System.Linq;
     using Logging;
-    using Transport;
 
     /// <summary>
     /// Represents the route table. The routes are prioritized in the registration order i.e. routes registered earlier take precedence over route registered later.
@@ -38,38 +37,20 @@ namespace NServiceBus.Router
             logger.Debug($"Adding route {entry}.");
         }
 
-        internal IEnumerable<string> GetOutgoingInterfaces(string incomingInterface, MessageContext context)
+        internal IEnumerable<string> GetOutgoingInterfaces(string incomingInterface, IEnumerable<Destination> destinations)
         {
-            return GetDestinations(context).Select(d => GetOutgoingInterface(incomingInterface, d));
+            return destinations.Select(d => GetOutgoingInterface(incomingInterface, d)).Distinct();
         }
 
-        internal IEnumerable<Route> Route(string incomingInterface, MessageContext context)
+        internal IEnumerable<Route> Route(string incomingInterface, IEnumerable<Destination> destinations)
         {
-            return GetDestinations(context).Select(d =>
+            foreach (var d in destinations)
             {
                 var nextHop = GetNextHop(incomingInterface, d);
-                return new Route(d.Endpoint, nextHop);
-            });
-        }
-
-        IEnumerable<Destination> GetDestinations(MessageContext context)
-        {
-            if (!context.Headers.TryGetValue("NServiceBus.Bridge.DestinationEndpoint", out var destinationEndpoint))
-            {
-                throw new UnforwardableMessageException("No 'NServiceBus.Bridge.DestinationEndpoint' header.");
-            }
-
-            if (!context.Headers.TryGetValue("NServiceBus.Bridge.DestinationSites", out var sites))
-            {
-                var dest = new Destination(destinationEndpoint, null);
-                yield return dest;
-                yield break;
-            }
-            var siteArray = sites.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
-            foreach (var s in siteArray)
-            {
-                var dest = new Destination(destinationEndpoint, s);
-                yield return dest;
+                if (nextHop != null || d.Endpoint != null)
+                {
+                    yield return new Route(d.Endpoint, nextHop);
+                }
             }
         }
 
@@ -93,7 +74,7 @@ namespace NServiceBus.Router
             var matchingEntry = entries.FirstOrDefault(e => e.DestinationFilter(incomingInterface, dest));
             if (matchingEntry != null)
             {
-                logger.Debug($"Using route {matchingEntry} to find next hop for message to {dest} coming via {incomingInterface}: {matchingEntry.Gateway}.");
+                logger.Debug($"Using route {matchingEntry} to find next hop for message to {dest} coming via {incomingInterface}: {matchingEntry.Gateway ?? "none"}.");
             }
             else if (defaultGateway != null)
             {

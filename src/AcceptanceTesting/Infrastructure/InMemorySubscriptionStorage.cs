@@ -6,7 +6,7 @@ using NServiceBus.Extensibility;
 using NServiceBus.Unicast.Subscriptions;
 using NServiceBus.Unicast.Subscriptions.MessageDrivenSubscriptions;
 
-class InMemorySubscriptionStorage : ISubscriptionStorage
+public class InMemorySubscriptionStorage : ISubscriptionStorage
 {
     public Task Subscribe(Subscriber subscriber, MessageType messageType, ContextBag context)
     {

@@ -2,7 +2,7 @@
 
 set @createTable = concat('
     create table if not exists ', @tableName, '(
-        Subscriber nvarchar(200) not null,
+        Subscriber nvarchar(200),
         Endpoint nvarchar(200),
         MessageType nvarchar(200) not null,
         PersistenceVersion varchar(23) not null,

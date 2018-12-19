@@ -7,6 +7,7 @@
     <PackageReference Include="NUnit" Version="3.7.*" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\NServiceBus.Router.SqlServer\NServiceBus.Router.SqlServer.csproj" />
     <ProjectReference Include="..\NServiceBus.Router\NServiceBus.Router.csproj" />
   </ItemGroup>
 </Project>

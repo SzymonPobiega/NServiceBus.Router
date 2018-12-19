@@ -1,7 +1,9 @@
 ﻿namespace NServiceBus.Router
 {
     using System;
+    using Raw;
     using Routing;
+    using Settings;
     using Transport;
     using Unicast.Subscriptions.MessageDrivenSubscriptions;
 
@@ -12,17 +14,37 @@
     public class InterfaceConfiguration<T>
         where T : TransportDefinition, new()
     {
-        string Name;
         Action<TransportExtensions<T>> customization;
+        Action<Type> enableFeature;
         bool? autoCreateQueues;
         string autoCreateQueuesIdentity;
         int? maximumConcurrency;
         ISubscriptionStorage subscriptionStorage;
 
-        internal InterfaceConfiguration(string name, Action<TransportExtensions<T>> customization)
+        /// <summary>
+        /// Router's extensibility settings.
+        /// </summary>
+        public SettingsHolder Settings { get; }
+
+        /// <summary>
+        /// Name of the interface.
+        /// </summary>
+        public string Name { get; }
+
+        internal InterfaceConfiguration(string name, Action<TransportExtensions<T>> customization, SettingsHolder settings, Action<Type> enableFeature)
         {
             Name = name;
+            Settings = settings;
             this.customization = customization;
+            this.enableFeature = enableFeature;
+        }
+
+        /// <summary>
+        /// Adds a feature.
+        /// </summary>
+        public void EnableFeature(Type featureType)
+        {
+            enableFeature(featureType);
         }
 
         /// <summary>
@@ -62,10 +84,10 @@
         /// </summary>
         public EndpointInstances EndpointInstances { get; } = new EndpointInstances();
 
-        internal Interface Create(string endpointName, RuntimeTypeGenerator typeGenerator, string poisonQueue, bool? hubAutoCreateQueues, string hubAutoCreateQueuesIdentity, InterceptMessageForwarding interceptMethod, Func<RouteTable> routeTable, int immediateRetries, int delayedRetries, int circuitBreakerThreshold)
+        internal Interface Create(string endpointName, string poisonQueue, bool? hubAutoCreateQueues, string hubAutoCreateQueuesIdentity, int immediateRetries, int delayedRetries, int circuitBreakerThreshold, RuntimeTypeGenerator typeGenerator)
         {
-            var routing = new ForwardingConfiguration(typeGenerator, EndpointInstances, subscriptionStorage, DistributionPolicy);
-            return new Interface<T>(endpointName, Name, customization, routing, routeTable, poisonQueue, maximumConcurrency, interceptMethod, autoCreateQueues ?? hubAutoCreateQueues ?? false, autoCreateQueuesIdentity ?? hubAutoCreateQueuesIdentity, immediateRetries, delayedRetries, circuitBreakerThreshold);
+            IRuleCreationContext ContextFactory(IRawEndpoint e) => new RuleCreationContext(Name, EndpointInstances, subscriptionStorage, DistributionPolicy, e, typeGenerator);
+            return new Interface<T>(endpointName, Name, customization, ContextFactory, poisonQueue, maximumConcurrency, autoCreateQueues ?? hubAutoCreateQueues ?? false, autoCreateQueuesIdentity ?? hubAutoCreateQueuesIdentity, immediateRetries, delayedRetries, circuitBreakerThreshold);
         }
     }
 }

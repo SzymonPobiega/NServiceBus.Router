@@ -6,7 +6,6 @@ using NServiceBus.AcceptanceTesting;
 using NServiceBus.AcceptanceTesting.Support;
 using NServiceBus.Router;
 
-
 class RouterComponent : IComponentBehavior
 {
     Func<ScenarioContext, RouterConfiguration> configCallback;
@@ -23,7 +22,7 @@ class RouterComponent : IComponentBehavior
         config.AutoCreateQueues();
         var newFactories = new List<Func<Interface>>();
 
-        foreach (var factory in config.PortFactories)
+        foreach (var factory in config.InterfaceFactories)
         {
             Interface NewFactory()
             {
@@ -33,7 +32,7 @@ class RouterComponent : IComponentBehavior
             newFactories.Add(NewFactory);
         }
 
-        config.PortFactories = newFactories;
+        config.InterfaceFactories = newFactories;
         var @switch = Router.Create(config);
         return Task.FromResult<ComponentRunner>(new Runner(@switch, "Router"));
     }

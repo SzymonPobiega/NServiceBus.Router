@@ -25,17 +25,17 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 .WithEndpoint<Publisher>(c => c.When(x => x.BaseEventSubscribed && x.DerivedEventSubscribed, s => s.Publish(new MyDerivedEvent())))
                 .WithEndpoint<BaseEventSubscriber>()
                 .WithEndpoint<DerivedEventSubscriber>()
-                .Done(c => c.BaseEventDelivered && c.DerivedEventDeilvered)
+                .Done(c => c.BaseEventDelivered && c.DerivedEventDelivered)
                 .Run();
 
             Assert.IsTrue(result.BaseEventDelivered);
-            Assert.IsTrue(result.DerivedEventDeilvered);
+            Assert.IsTrue(result.DerivedEventDelivered);
         }
 
         class Context : ScenarioContext
         {
             public bool BaseEventDelivered { get; set; }
-            public bool DerivedEventDeilvered { get; set; }
+            public bool DerivedEventDelivered { get; set; }
             public bool BaseEventSubscribed { get; set; }
             public bool DerivedEventSubscribed { get; set; }
         }
@@ -116,7 +116,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
 
                 public Task Handle(MyDerivedEvent message, IMessageHandlerContext context)
                 {
-                    scenarioContext.DerivedEventDeilvered = true;
+                    scenarioContext.DerivedEventDelivered = true;
                     return Task.CompletedTask;
                 }
             }

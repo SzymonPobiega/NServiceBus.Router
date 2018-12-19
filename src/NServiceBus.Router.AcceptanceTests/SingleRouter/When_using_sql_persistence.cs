@@ -41,7 +41,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
         static SqlSubscriptionStorage GetSubscriptionStorage(string tablePrefix)
         {
             var storage = new SqlSubscriptionStorage(
-                () => new SqlConnection(@"Data Source=.\SQLEXPRESS;Initial Catalog=nservicebus;Integrated Security=True"),
+                () => new SqlConnection(@"Data Source=(local);Initial Catalog=nservicebus;Integrated Security=True"),
                 tablePrefix, new SqlDialect.MsSqlServer(), null);
             return storage;
         }

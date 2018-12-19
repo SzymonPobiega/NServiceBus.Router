@@ -5,6 +5,7 @@ using NServiceBus;
 using NServiceBus.Extensibility;
 using NServiceBus.Logging;
 using NServiceBus.Raw;
+using NServiceBus.Router;
 using NServiceBus.Routing;
 using NServiceBus.Settings;
 using NServiceBus.Transport;
@@ -160,7 +161,9 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
 
     Task IDispatchMessages.Dispatch(TransportOperations outgoingMessages, TransportTransaction transaction, ContextBag context)
     {
-        return endpoint.Dispatch(outgoingMessages, transaction, context);
+        return endpoint != null 
+            ? endpoint.Dispatch(outgoingMessages, transaction, context) 
+            : startable.Dispatch(outgoingMessages, transaction, context);
     }
 
     string IRawEndpoint.TransportAddress => startable?.TransportAddress ?? endpoint.TransportAddress;
@@ -195,6 +198,11 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
 
         public async Task<ErrorHandleResult> OnError(IErrorHandlingPolicyContext handlingContext, IDispatchMessages dispatcher)
         {
+            if (handlingContext.Error.Exception is UnforwardableMessageException)
+            {
+                //UnforwardableMessageException immediately triggers poison queue
+                return await poisonMessageHandling(handlingContext, dispatcher).ConfigureAwait(false);
+            }
             if (handlingContext.Error.ImmediateProcessingFailures < immediateRetries)
             {
                 return ErrorHandleResult.RetryRequired;
@@ -214,7 +222,7 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
             //Only increment the delayed retries count if CB was not armed. That means that at least one message was
             //successfully forwarded in between previous failure of this message and this failure.
             //This prevents prematurely exhausting delayed retries attempts without triggering the throttled mode
-            if (!circuitBreaker.IsArmed)
+            if (!circuitBreaker.IsArmed && !(handlingContext.Error.Exception is ProcessCurrentMessageLaterException))
             {
                 var newDelayedRetriesHeaderValue = handlingContext.Error.DelayedDeliveriesPerformed + 1;
                 incomingMessage.Headers[Headers.DelayedRetries] = newDelayedRetriesHeaderValue.ToString();

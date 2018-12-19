@@ -4,79 +4,92 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 
-class RuntimeTypeGenerator
+namespace NServiceBus.Router
 {
-    public Type GetType(string messageType)
+    /// <summary>
+    /// Converts type names to type objects.
+    /// </summary>
+    public class RuntimeTypeGenerator
     {
-        var knownType = Type.GetType(messageType, false);
-        if (knownType != null)
+        /// <summary>
+        /// Returns the type object for a given message type string.
+        /// </summary>
+        public Type GetType(string messageType)
         {
-            return knownType;
-        }
-
-        var parts = messageType.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-        var nameAndNamespace = parts[0];
-        var assembly = parts[1];
-
-        ModuleBuilder moduleBuilder;
-        lock (assemblies)
-        {
-            if (!assemblies.TryGetValue(assembly, out moduleBuilder))
+            var knownType = Type.GetType(messageType, false);
+            if (knownType != null)
             {
-                var assemblyName = new AssemblyName(assembly);
-                var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
-                moduleBuilder = assemblyBuilder.DefineDynamicModule(assembly);
-                assemblies[assembly] = moduleBuilder;
+                return knownType;
             }
-        }
-        Type result;
-        lock (types)
-        {
-            if (!types.TryGetValue(messageType, out result))
+
+            var parts = messageType.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries);
+            var nameAndNamespace = parts[0];
+            var assembly = parts[1];
+
+            ModuleBuilder moduleBuilder;
+            lock (assemblies)
             {
-                var nestedParts = nameAndNamespace.Split(new[] { '+' }, StringSplitOptions.RemoveEmptyEntries);
-
-                var typeBuilder = GetRootTypeBuilder(moduleBuilder, nestedParts[0]);
-
-                for (var i = 1; i < nestedParts.Length; i++)
+                if (!assemblies.TryGetValue(assembly, out moduleBuilder))
                 {
-                    var path = string.Join("+", nestedParts.Take(i + 1));
-                    typeBuilder = GetNestedTypeBuilder(typeBuilder, nestedParts[i], path);
+                    var assemblyName = new AssemblyName(assembly);
+                    var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
+                    moduleBuilder = assemblyBuilder.DefineDynamicModule(assembly);
+                    assemblies[assembly] = moduleBuilder;
                 }
-                result = typeBuilder.CreateTypeInfo();
-                types[messageType] = result;
             }
-        }
-        return result;
-    }
 
-    TypeBuilder GetRootTypeBuilder(ModuleBuilder moduleBuilder, string name)
-    {
-        if (typeBuilders.TryGetValue(name, out var builder))
+            Type result;
+            lock (types)
+            {
+                if (!types.TryGetValue(messageType, out result))
+                {
+                    var nestedParts = nameAndNamespace.Split(new[] {'+'}, StringSplitOptions.RemoveEmptyEntries);
+
+                    var typeBuilder = GetRootTypeBuilder(moduleBuilder, nestedParts[0]);
+
+                    for (var i = 1; i < nestedParts.Length; i++)
+                    {
+                        var path = string.Join("+", nestedParts.Take(i + 1));
+                        typeBuilder = GetNestedTypeBuilder(typeBuilder, nestedParts[i], path);
+                    }
+
+                    result = typeBuilder.CreateTypeInfo();
+                    types[messageType] = result;
+                }
+            }
+
+            return result;
+        }
+
+        TypeBuilder GetRootTypeBuilder(ModuleBuilder moduleBuilder, string name)
         {
+            if (typeBuilders.TryGetValue(name, out var builder))
+            {
+                return builder;
+            }
+
+            builder = moduleBuilder.DefineType(name, TypeAttributes.Public);
+            typeBuilders[name] = builder;
+            builder.CreateTypeInfo();
             return builder;
         }
 
-        builder = moduleBuilder.DefineType(name, TypeAttributes.Public);
-        typeBuilders[name] = builder;
-        builder.CreateTypeInfo();
-        return builder;
-    }
-
-    TypeBuilder GetNestedTypeBuilder(TypeBuilder typeBuilder, string name, string path)
-    {
-        if (typeBuilders.TryGetValue(path, out var builder))
+        TypeBuilder GetNestedTypeBuilder(TypeBuilder typeBuilder, string name, string path)
         {
+            if (typeBuilders.TryGetValue(path, out var builder))
+            {
+                return builder;
+            }
+
+            builder = typeBuilder.DefineNestedType(name);
+            typeBuilders[path] = builder;
+            builder.CreateTypeInfo();
             return builder;
         }
 
-        builder = typeBuilder.DefineNestedType(name);
-        typeBuilders[path] = builder;
-        builder.CreateTypeInfo();
-        return builder;
+        Dictionary<string, ModuleBuilder> assemblies = new Dictionary<string, ModuleBuilder>();
+        Dictionary<string, Type> types = new Dictionary<string, Type>();
+        Dictionary<string, TypeBuilder> typeBuilders = new Dictionary<string, TypeBuilder>();
     }
 
-    Dictionary<string, ModuleBuilder> assemblies = new Dictionary<string, ModuleBuilder>();
-    Dictionary<string, Type> types = new Dictionary<string, Type>();
-    Dictionary<string, TypeBuilder> typeBuilders = new Dictionary<string, TypeBuilder>();
 }

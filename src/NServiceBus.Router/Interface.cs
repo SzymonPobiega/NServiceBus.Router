@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using NServiceBus;
 using NServiceBus.Router;
 using NServiceBus.Configuration.AdvancedExtensibility;
+using NServiceBus.Logging;
 using NServiceBus.Raw;
 using NServiceBus.Settings;
 using NServiceBus.Transport;
@@ -10,8 +11,7 @@ using NServiceBus.Transport;
 interface Interface
 {
     string Name { get; }
-    Task Forward(string source, MessageContext context);
-    Task Initialize(Func<MessageContext, Task> onMessage);
+    Task Initialize(InterfaceChains interfaces, RootContext rootContext);
     Task StartReceiving();
     Task StopReceiving();
     Task Stop();
@@ -20,31 +20,21 @@ interface Interface
 class Interface<T> : Interface where T : TransportDefinition, new()
 {
     public string Name { get; }
-    public Interface(string endpointName, string interfaceName, Action<TransportExtensions<T>> transportCustomization, ForwardingConfiguration forwardingConfiguration, Func<RouteTable> routeTable, string poisonQueue, int? maximumConcurrency, InterceptMessageForwarding interceptMethod, bool autoCreateQueues, string autoCreateQueuesIdentity, int immediateRetries, int delayedRetries, int circuitBreakerThreshold)
+    public Interface(string endpointName, string interfaceName, Action<TransportExtensions<T>> transportCustomization, Func<IRawEndpoint, IRuleCreationContext> ruleCreationContextFactory, string poisonQueue, int? maximumConcurrency, bool autoCreateQueues, string autoCreateQueuesIdentity, int immediateRetries, int delayedRetries, int circuitBreakerThreshold)
     {
-        this.endpointName = endpointName;
-        this.forwardingConfiguration = forwardingConfiguration;
-        this.interceptMethod = interceptMethod;
-        this.routeTable = routeTable;
+        this.ruleCreationContextFactory = ruleCreationContextFactory;
         Name = interfaceName;
-        sendForwarder = forwardingConfiguration.PrepareSending();
-        replyForwarder = new ReplyForwarder();
-
         rawConfig = new ThrottlingRawEndpointConfig<T>(endpointName, poisonQueue, ext =>
             {
                 SetTransportSpecificFlags(ext.GetSettings(), poisonQueue);
                 transportCustomization?.Invoke(ext);
             },
-            async (context, _) =>
+            (context, _) => preroutingChain.Invoke(new RawContext(context, Name, rootContext)),
+            (context, dispatcher) =>
             {
-                var intent = GetMesssageIntent(context);
-                if (intent == MessageIntentEnum.Subscribe || intent == MessageIntentEnum.Unsubscribe)
-                {
-                    await subscriptionReceiver.Receive(context, intent);
-                }
-                await onMessage(context);
+                log.Error("Moving poison message to the error queue", context.Error.Exception);
+                return context.MoveToErrorQueue(poisonQueue);
             },
-            (context, dispatcher) => context.MoveToErrorQueue(poisonQueue),
             maximumConcurrency,
             immediateRetries, delayedRetries, circuitBreakerThreshold, autoCreateQueues, autoCreateQueuesIdentity);
     }
@@ -55,47 +45,13 @@ class Interface<T> : Interface where T : TransportDefinition, new()
         settings.Set("RabbitMQ.RoutingTopologySupportsDelayedDelivery", true);
     }
 
-    public Task Forward(string source, MessageContext context)
+    public async Task Initialize(InterfaceChains interfaces, RootContext rootContext)
     {
-        return interceptMethod(source, context, sender.Dispatch, 
-            dispatch => Forward(source, context, new InterceptingDispatcher(sender, dispatch, endpointName)));
-    }
-
-    Task Forward(string incomingInterface, MessageContext context, IRawEndpoint dispatcher)
-    {
-        var intent = GetMesssageIntent(context);
-
-        switch (intent)
-        {
-            case MessageIntentEnum.Subscribe:
-            case MessageIntentEnum.Unsubscribe:
-                return subscriptionForwarder.Forward(incomingInterface, context, intent, dispatcher, routeTable());
-            case MessageIntentEnum.Publish:
-                return publishForwarder.Forward(context, dispatcher);
-            case MessageIntentEnum.Send:
-                return sendForwarder.Forward(incomingInterface, context, dispatcher, routeTable());
-            case MessageIntentEnum.Reply:
-                return replyForwarder.Forward(context, intent, dispatcher);
-            default:
-                throw new UnforwardableMessageException("Unroutable message intent: " + intent);
-        }
-    }
-
-    static MessageIntentEnum GetMesssageIntent(MessageContext message)
-    {
-        var messageIntent = default(MessageIntentEnum);
-        if (message.Headers.TryGetValue(Headers.MessageIntent, out var messageIntentString))
-        {
-            Enum.TryParse(messageIntentString, true, out messageIntent);
-        }
-        return messageIntent;
-    }
-
-    public async Task Initialize(Func<MessageContext, Task> onMessage)
-    {
-        this.onMessage = onMessage;
+        this.rootContext = rootContext;
         sender = await rawConfig.Create().ConfigureAwait(false);
-        forwardingConfiguration.PreparePubSub(sender, out publishForwarder, out subscriptionReceiver, out subscriptionForwarder);
+        var ruleCreationContext = ruleCreationContextFactory(sender);
+        interfaces.InitializeInterface(Name, ruleCreationContext);
+        preroutingChain = interfaces.GetChainsFor(Name).Get<RawContext>();
     }
 
     public async Task StartReceiving()
@@ -124,20 +80,13 @@ class Interface<T> : Interface where T : TransportDefinition, new()
         }
     }
 
-    string endpointName;
-    ForwardingConfiguration forwardingConfiguration;
-    InterceptMessageForwarding interceptMethod;
-    Func<RouteTable> routeTable;
-    Func<MessageContext, Task> onMessage;
+    static ILog log = LogManager.GetLogger(typeof(Interface));
     IReceivingRawEndpoint receiver;
     IStartableRawEndpoint sender;
     IStoppableRawEndpoint stoppable;
 
-    SubscriptionReceiver subscriptionReceiver;
-    SubscriptionForwarder subscriptionForwarder;
-    IPublishForwarder publishForwarder;
-
     ThrottlingRawEndpointConfig<T> rawConfig;
-    SendForwarder sendForwarder;
-    ReplyForwarder replyForwarder;
+    IChain<RawContext> preroutingChain;
+    Func<IRawEndpoint, IRuleCreationContext> ruleCreationContextFactory;
+    RootContext rootContext;
 }

@@ -39,17 +39,17 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                     await s.Subscribe<MyDerivedEvent1>().ConfigureAwait(false);
                     await s.Send(new TracerMessage()).ConfigureAwait(false);
                 }))
-                .Done(c => c.BaseEventDelivered && c.DerivedEventDeilvered)
+                .Done(c => c.BaseEventDelivered && c.DerivedEventDelivered)
                 .Run();
 
             Assert.IsTrue(result.BaseEventDelivered);
-            Assert.IsTrue(result.DerivedEventDeilvered);
+            Assert.IsTrue(result.DerivedEventDelivered);
         }
 
         class Context : ScenarioContext
         {
             public bool BaseEventDelivered { get; set; }
-            public bool DerivedEventDeilvered { get; set; }
+            public bool DerivedEventDelivered { get; set; }
             public bool BaseEventSubscribed { get; set; }
             public bool DerivedEventSubscribed { get; set; } = true;
         }
@@ -145,7 +145,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
 
                 public Task Handle(MyDerivedEvent1 message, IMessageHandlerContext context)
                 {
-                    scenarioContext.DerivedEventDeilvered = true;
+                    scenarioContext.DerivedEventDelivered = true;
                     return Task.CompletedTask;
                 }
             }
