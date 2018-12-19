@@ -109,7 +109,7 @@ namespace NServiceBus.Router.AcceptanceTests.Poison
                     foreach (var operation in context.Operations)
                     {
                         operation.Message.Headers[Headers.CorrelationId] 
-                            = operation.Message.Headers[Headers.CorrelationId].Replace("|iface|4|Left", "");
+                            = operation.Message.Headers[Headers.CorrelationId].Replace("iface|4|Left|", "");
                     }
 
                     return next(context);
