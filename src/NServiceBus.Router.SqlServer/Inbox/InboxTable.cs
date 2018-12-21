@@ -29,14 +29,14 @@ insert into [{name}] (Seq, MessageId) values (@seq, @messageId)", conn, trans))
             }
         }
 
-        public async Task<bool> HasHoles(SessionState sessionState, SqlConnection conn)
+        public async Task<bool> HasHoles(SessionState sessionState, SqlConnection conn, SqlTransaction trans)
         {
             var epochSize = sessionState.Hi - sessionState.Lo;
 
             //We can use a count query here because there is a check that ensure that inserting a message that is outside
             //of watermarks cannot be committed. If we count the non-locked (comitted) messages and the count is equal to epoch
             //it means there is no holes
-            using (var command = new SqlCommand($"select count(Seq) from [{name}] with(readpast)", conn))
+            using (var command = new SqlCommand($"select count(Seq) from [{name}] with(readpast)", conn, trans))
             {
                 var count = (int)await command.ExecuteScalarAsync().ConfigureAwait(false);
 
