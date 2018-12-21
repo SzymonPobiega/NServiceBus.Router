@@ -51,7 +51,8 @@ class ForwardPublishStorageDrivenRule : IRule<ForwardPublishContext, ForwardPubl
 
     IEnumerable<Task> CreateDispatchTasksForSubscribersWithEndpointNameAndAddress(ForwardPublishContext context, Subscriber[] subscribers)
     {
-        var destinations = SelectDestinationsForEachEndpoint(subscribers.Where(s => s.Endpoint != null && s.TransportAddress != null));
+        var matchingSubscribers = subscribers.Where(s => s.Endpoint != null && s.TransportAddress != null);
+        var destinations = SelectDestinationsForEachEndpoint(matchingSubscribers);
 
         var operations = destinations
             .Select(x => new TransportOperation(new OutgoingMessage(context.MessageId, context.ReceivedHeaders.Copy(), context.ReceivedBody), new UnicastAddressTag(x)));
@@ -65,7 +66,8 @@ class ForwardPublishStorageDrivenRule : IRule<ForwardPublishContext, ForwardPubl
 
     static IEnumerable<Task> CreateDispatchTasksForSubscribersWithEndpointNameOnly(ForwardPublishContext context, Subscriber[] subscribers)
     {
-        var contexts = subscribers.Select(s =>
+        var matchingSubscribers = subscribers.Where(s => s.Endpoint != null && s.TransportAddress == null);
+        var contexts = matchingSubscribers.Select(s =>
         {
             var message = new OutgoingMessage(context.MessageId, context.ReceivedHeaders.Copy(), context.ReceivedBody);
             return new AnycastContext(s.Endpoint, message, DistributionStrategyScope.Publish, context);
