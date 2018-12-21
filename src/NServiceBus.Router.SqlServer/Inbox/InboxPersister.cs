@@ -133,11 +133,6 @@
             var tableName = queriedLinkState.TailSession.Table;
             var table = new InboxTable(tableName);
 
-            if (await table.HasHoles(queriedLinkState.TailSession, conn).ConfigureAwait(false))
-            {
-                throw new ProcessCurrentMessageLaterException($"Inbox table {tableName} seems to have holes in the sequence. Cannot close yet.");
-            }
-
             log.Debug($"Closing inbox table {tableName}.");
             LinkState newLinkState;
             using (var closeTransaction = conn.BeginTransaction())
@@ -158,6 +153,11 @@
                 if (nextEpoch > lockedLinkState.Epoch + 1)
                 {
                     throw new ProcessCurrentMessageLaterException($"The link state is at epoch {lockedLinkState.Epoch} and is not ready to transition to epoch {nextEpoch}.");
+                }
+
+                if (await table.HasHoles(queriedLinkState.TailSession, conn, closeTransaction).ConfigureAwait(false))
+                {
+                    throw new ProcessCurrentMessageLaterException($"Inbox table {tableName} seems to have holes in the sequence. Cannot close yet.");
                 }
 
                 newLinkState = lockedLinkState.Advance(nextLo, nextHi);
