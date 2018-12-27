@@ -29,9 +29,9 @@ values
             }
         }
 
-        public async Task<LinkState> Get(string sourceKey, SqlConnection conn)
+        public async Task<LinkState> Get(string sourceKey, SqlConnection conn, SqlTransaction trans)
         {
-            using (var command = new SqlCommand($"select Epoch, HeadLo, HeadHi, HeadTable, TailLo, TailHi, TailTable from [Inbox_LinkState_{destinationKey}] where Source = @key", conn))
+            using (var command = new SqlCommand($"select Epoch, HeadLo, HeadHi, HeadTable, TailLo, TailHi, TailTable from [Inbox_LinkState_{destinationKey}] where Source = @key", conn, trans))
             {
                 command.Parameters.AddWithValue("@key", sourceKey);
                 using (var reader = await command.ExecuteReaderAsync().ConfigureAwait(false))
