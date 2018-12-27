@@ -1,7 +1,6 @@
 ﻿namespace NServiceBus.Router
 {
     using System;
-    using System.Threading.Tasks;
 
     /// <summary>
     /// Defines the context for the forward publish chain.
@@ -16,7 +15,6 @@
         {
             ReceivedHeaders = parentContext.Headers;
             ReceivedBody = parentContext.Body;
-            MessageId = parentContext.MessageId;
             Types = parentContext.Types;
             RootEventType = rootType;
         }
@@ -40,18 +38,5 @@
         /// The headers associated with the received message.
         /// </summary>
         public byte[] ReceivedBody { get; }
-
-        /// <summary>
-        /// The ID of the received message.
-        /// </summary>
-        public string MessageId { get; }
-    }
-
-    class ForwardPublishTerminator : ChainTerminator<ForwardPublishContext>
-    {
-        protected override Task Terminate(ForwardPublishContext context)
-        {
-            return Task.CompletedTask;
-        }
     }
 }

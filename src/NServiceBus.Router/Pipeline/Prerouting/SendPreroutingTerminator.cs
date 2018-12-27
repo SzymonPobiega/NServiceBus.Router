@@ -8,7 +8,7 @@ class SendPreroutingTerminator : ChainTerminator<SendPreroutingContext>
     {
         this.routingProtocol = routingProtocol;
     }
-    protected override Task Terminate(SendPreroutingContext context)
+    protected override async Task<bool> Terminate(SendPreroutingContext context)
     {
         if (!context.Destinations.Any())
         {
@@ -28,7 +28,9 @@ class SendPreroutingTerminator : ChainTerminator<SendPreroutingContext>
                 return chain.Invoke(new ForwardSendContext(iface, routes.ToArray(), context));
             });
 
-        return Task.WhenAll(forkTasks);
+        await Task.WhenAll(forkTasks).ConfigureAwait(false);
+
+        return true;
     }
 
     IRoutingProtocol routingProtocol;

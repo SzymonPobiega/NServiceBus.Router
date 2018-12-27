@@ -3,7 +3,6 @@
     using System;
     using Raw;
     using Routing;
-    using Settings;
     using Transport;
     using Unicast.Subscriptions.MessageDrivenSubscriptions;
 
@@ -15,44 +14,58 @@
         where T : TransportDefinition, new()
     {
         Action<TransportExtensions<T>> customization;
-        Action<Type> enableFeature;
         bool? autoCreateQueues;
         string autoCreateQueuesIdentity;
         int? maximumConcurrency;
-        ISubscriptionStorage subscriptionStorage;
 
         /// <summary>
-        /// Router's extensibility settings.
+        /// Interface's extensibility settings.
         /// </summary>
-        public SettingsHolder Settings { get; }
+        public SettingsHolder Settings { get; } = new SettingsHolder();
 
         /// <summary>
         /// Name of the interface.
         /// </summary>
         public string Name { get; }
 
-        internal InterfaceConfiguration(string name, Action<TransportExtensions<T>> customization, SettingsHolder settings, Action<Type> enableFeature)
+        /// <summary>
+        /// Router's configuration.
+        /// </summary>
+        public RouterConfiguration RouterConfiguration { get; }
+
+        internal InterfaceConfiguration(string name, Action<TransportExtensions<T>> customization, RouterConfiguration routerConfiguration)
         {
             Name = name;
-            Settings = settings;
             this.customization = customization;
-            this.enableFeature = enableFeature;
+            RouterConfiguration = routerConfiguration;
         }
 
         /// <summary>
-        /// Adds a feature.
+        /// Adds a global (applicable to all interfaces) routing rule.
         /// </summary>
-        public void EnableFeature(Type featureType)
+        /// <typeparam name="TRule">Type of the rule.</typeparam>
+        /// <param name="constructor">Delegate that constructs a new instance of the rule.</param>
+        /// <param name="condition">Condition which must be true for the rule to be added to the chain.</param>
+        public void AddRule<TRule>(Func<IRuleCreationContext, TRule> constructor, Func<IRuleCreationContext, bool> condition = null)
+            where TRule : IRule
         {
-            enableFeature(featureType);
+            RouterConfiguration.AddRule(constructor, context =>
+            {
+                if (condition == null)
+                {
+                    return context.InterfaceName == Name;
+                }
+                return condition(context) && context.InterfaceName == Name;
+            });
         }
 
         /// <summary>
         /// Configures the port to use specified subscription persistence.
         /// </summary>
+        [Obsolete("Use EnableMessageDrivenPublishSubscribe instead.")]
         public void UseSubscriptionPersistence(ISubscriptionStorage subscriptionStorage)
         {
-            this.subscriptionStorage = subscriptionStorage;
+            this.EnableMessageDrivenPublishSubscribe(subscriptionStorage);
         }
 
         /// <summary>
@@ -84,10 +97,15 @@
         /// </summary>
         public EndpointInstances EndpointInstances { get; } = new EndpointInstances();
 
-        internal Interface Create(string endpointName, string poisonQueue, bool? hubAutoCreateQueues, string hubAutoCreateQueuesIdentity, int immediateRetries, int delayedRetries, int circuitBreakerThreshold, RuntimeTypeGenerator typeGenerator)
+        internal Interface Create(string endpointName, string poisonQueue, bool? routerAutoCreateQueues, string routerAutoCreateQueuesIdentity, int immediateRetries, int delayedRetries, int circuitBreakerThreshold, RuntimeTypeGenerator typeGenerator, SettingsHolder routerSettings)
         {
-            IRuleCreationContext ContextFactory(IRawEndpoint e) => new RuleCreationContext(Name, EndpointInstances, subscriptionStorage, DistributionPolicy, e, typeGenerator);
-            return new Interface<T>(endpointName, Name, customization, ContextFactory, poisonQueue, maximumConcurrency, autoCreateQueues ?? hubAutoCreateQueues ?? false, autoCreateQueuesIdentity ?? hubAutoCreateQueuesIdentity, immediateRetries, delayedRetries, circuitBreakerThreshold);
+            IRuleCreationContext ContextFactory(IRawEndpoint e)
+            {
+                Settings.Merge(routerSettings);
+                return new RuleCreationContext(Name, EndpointInstances, DistributionPolicy, e, typeGenerator, Settings);
+            }
+
+            return new Interface<T>(endpointName, Name, customization, ContextFactory, poisonQueue, maximumConcurrency, autoCreateQueues ?? routerAutoCreateQueues ?? false, autoCreateQueuesIdentity ?? routerAutoCreateQueuesIdentity, immediateRetries, delayedRetries, circuitBreakerThreshold);
         }
     }
 }

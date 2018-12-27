@@ -3,7 +3,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using NServiceBus.Logging;
 using NServiceBus.Router;
-using NServiceBus.Settings;
 
 class RouterImpl : IRouter
 {

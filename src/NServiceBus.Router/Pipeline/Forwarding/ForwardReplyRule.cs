@@ -5,11 +5,10 @@ using NServiceBus.Router;
 using NServiceBus.Routing;
 using NServiceBus.Transport;
 
-class ForwardReplyRule : IRule<ForwardReplyContext, ForwardReplyContext>
+class ForwardReplyRule : ChainTerminator<ForwardReplyContext>
 {
-    public async Task Invoke(ForwardReplyContext context, Func<ForwardReplyContext, Task> next)
+    protected override async Task<bool> Terminate(ForwardReplyContext context)
     {
-        var forwardedHeaders = context.ReceivedHeaders.Copy();
         string replyTo = null;
         string replyToRouter = null;
         if (!context.ReceivedHeaders.TryGetValue(Headers.CorrelationId, out var correlationId))
@@ -27,7 +26,7 @@ class ForwardReplyRule : IRule<ForwardReplyContext, ForwardReplyContext>
                 }
                 if (t == "id")
                 {
-                    forwardedHeaders[Headers.CorrelationId] = v;
+                    context.ForwardedHeaders[Headers.CorrelationId] = v;
                 }
                 if (t == "reply-to-router")
                 {
@@ -40,7 +39,7 @@ class ForwardReplyRule : IRule<ForwardReplyContext, ForwardReplyContext>
             throw new UnforwardableMessageException($"Cannot decode value in '{Headers.CorrelationId}' header: " + e.Message);
         }
 
-        var outgoingMessage = new OutgoingMessage(context.MessageId, forwardedHeaders, context.ReceivedBody);
+        var outgoingMessage = new OutgoingMessage(context.MessageId, context.ForwardedHeaders, context.ReceivedBody);
         if (replyTo != null)
         {
             var operation = new TransportOperation(outgoingMessage, new UnicastAddressTag(replyTo));
@@ -48,19 +47,19 @@ class ForwardReplyRule : IRule<ForwardReplyContext, ForwardReplyContext>
             var chain = context.Chains.Get<PostroutingContext>();
             var forkContext = new PostroutingContext(operation, context);
             await chain.Invoke(forkContext).ConfigureAwait(false);
-            await next(context).ConfigureAwait(false);
+
+            return true;
         }
-        else if (replyToRouter != null)
+        if (replyToRouter != null)
         {
             var chain = context.Chains.Get<AnycastContext>();
             var forkContext = new AnycastContext(replyToRouter, outgoingMessage, DistributionStrategyScope.Send, context);
+
             await chain.Invoke(forkContext).ConfigureAwait(false);
-        }
-        else
-        {
-            throw new UnforwardableMessageException("The reply contains neither \'reply-to\' nor \'reply-to-router\' correlation parameters required to route the message.");
+
+            return true;
         }
 
-        await next(context).ConfigureAwait(false);
+        throw new UnforwardableMessageException("The reply contains neither \'reply-to\' nor \'reply-to-router\' correlation parameters required to route the message.");
     }
 }

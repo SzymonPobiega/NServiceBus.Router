@@ -3,7 +3,6 @@
     using System.Threading.Tasks;
     using Inbox;
     using Outbox;
-    using Settings;
 
     class Installer : IModule
     {

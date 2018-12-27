@@ -19,6 +19,8 @@ namespace NServiceBus.Router
                 throw new Exception("Routing protocol must be configured.");
             }
 
+            config.EnableFeature(typeof(NativePubSubFeature));
+
             foreach (var featureType in config.Features)
             {
                 var feature = (IFeature)Activator.CreateInstance(featureType);
@@ -51,7 +53,6 @@ namespace NServiceBus.Router
             chains.AddRule(_ => new PreroutingToSendPreroutingFork());
             chains.AddRule(_ => new PreroutingToPublishPreroutingFork());
             chains.AddRule(_ => new PreroutingToReplyPreroutingFork());
-            chains.AddRule(_ => new PreroutingTerminator());
 
             chains.AddRule(c => new DetectCyclesRule(c.Endpoint.EndpointName));
 
@@ -65,31 +66,17 @@ namespace NServiceBus.Router
             chains.AddRule(_ => new FindUnsubscribeDestinationsByHeadersRule());
             chains.AddRule(_ => new FindSendDestinationsByHeadersRule());
 
-
-            chains.AddRule(c => new ForwardPublishNativeRule(), c => c.HasNativePubSub());
-            chains.AddRule(c => new ForwardSubscribeNativeRule(c.Endpoint.SubscriptionManager), c => c.HasNativePubSub());
-            chains.AddRule(c => new ForwardUnsubscribeNativeRule(c.Endpoint.SubscriptionManager), c => c.HasNativePubSub());
-
-            chains.AddRule(c => new ForwardPublishStorageDrivenRule(c.SubscriptionPersistence, c.DistributionPolicy), c => !c.HasNativePubSub());
-            chains.AddRule(c => new ForwardSubscribeMessageDrivenRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName), c => !c.HasNativePubSub());
-            chains.AddRule(c => new ForwardUnsubscribeMessageDrivenRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName), c => !c.HasNativePubSub());
-            chains.AddRule(c => new StorageDrivenSubscriptionRule(c.SubscriptionPersistence), c => !c.HasNativePubSub());
-
-            chains.AddRule(c => new ForwardSendRule(c.Endpoint.TransportAddress));
-            chains.AddRule(c => new ForwardSendGatewayRule(c.Endpoint.EndpointName));
+            chains.AddRule(c => new ForwardSendRule());
+            chains.AddRule(c => new ForwardSendGatewayRule());
             chains.AddRule(_ => new ForwardReplyRule());
+            chains.AddRule(c => new SendReplyTraceRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName));
+            chains.AddRule(c => new PublishReplyTraceRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName));
             chains.AddRule(c => new ForwardSubscribeGatewayRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName));
             chains.AddRule(c => new ForwardUnsubscribeGatewayRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName));
 
             chains.AddRule(c => new AnycastToPostroutingConnector(c.EndpointInstances, c.DistributionPolicy, instance => c.Endpoint.ToTransportAddress(LogicalAddress.CreateRemoteAddress(instance))));
             chains.AddRule(c => new MulticastToPostroutingConnector(c.EndpointInstances, instance => c.Endpoint.ToTransportAddress(LogicalAddress.CreateRemoteAddress(instance))));
             chains.AddRule(c => new PostroutingTerminator(c.Endpoint));
-
-            chains.AddRule(_ => new ForwardSubscribeTerminator());
-            chains.AddRule(_ => new ForwardUnsubscribeTerminator());
-            chains.AddRule(_ => new ForwardSendTerminator());
-            chains.AddRule(_ => new ForwardPublishTerminator());
-            chains.AddRule(_ => new ForwardReplyTerminator());
 
             return new RouterImpl(config.Name, interfaces, config.Modules.ToArray(), config.RoutingProtocol, chains, config.Settings);
         }

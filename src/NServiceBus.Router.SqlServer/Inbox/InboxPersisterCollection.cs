@@ -4,7 +4,6 @@
     using System.Data.SqlClient;
     using System.Linq;
     using System.Threading.Tasks;
-    using Settings;
 
     class InboxPersisterCollection : IModule
     {

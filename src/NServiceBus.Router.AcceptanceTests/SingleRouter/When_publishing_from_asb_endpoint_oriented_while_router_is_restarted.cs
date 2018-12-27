@@ -51,7 +51,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
 
         void ConfigureRouter(Context c, RouterConfiguration cfg)
         {
-            cfg.AddInterface<TestTransport>("Left", t => t.BrokerAlpha()).UseSubscriptionPersistence(subscriptionStorage);
+            cfg.AddInterface<TestTransport>("Left", t => t.BrokerAlpha()).EnableMessageDrivenPublishSubscribe(subscriptionStorage);
             var leftIface = cfg.AddInterface<AzureServiceBusTransport>("Right", t =>
             {
                 var connString = Environment.GetEnvironmentVariable("AzureServiceBus.ConnectionString");
