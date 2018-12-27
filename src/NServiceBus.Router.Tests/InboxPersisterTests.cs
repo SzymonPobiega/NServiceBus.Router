@@ -89,7 +89,6 @@ public class InboxPersisterTests
 
             await persister.Deduplicate("M1", 0, conn, null).ConfigureAwait(false);
             await persister.Deduplicate("M2", 1, conn, null).ConfigureAwait(false);
-            await persister.Deduplicate("M3", 2, conn, null).ConfigureAwait(false);
 
             try
             {
@@ -114,7 +113,6 @@ public class InboxPersisterTests
 
             await persister.Deduplicate("M1", 0, conn, null).ConfigureAwait(false);
             await persister.Deduplicate("M2", 1, conn, null).ConfigureAwait(false);
-            await persister.Deduplicate("M3", 2, conn, null).ConfigureAwait(false);
 
             var linkState = await persister.Advance(1, 3, 6, conn).ConfigureAwait(false);
 
