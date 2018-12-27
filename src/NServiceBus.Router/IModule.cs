@@ -1,7 +1,6 @@
 namespace NServiceBus.Router
 {
     using System.Threading.Tasks;
-    using Settings;
 
     /// <summary>
     /// Represents extension of the router.

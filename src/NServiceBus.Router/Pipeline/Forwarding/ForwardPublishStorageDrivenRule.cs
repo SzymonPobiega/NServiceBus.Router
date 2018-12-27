@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using NServiceBus;
@@ -38,7 +37,6 @@ class ForwardPublishStorageDrivenRule : ChainTerminator<ForwardPublishContext>
         }
         await Task.WhenAll(tasks).ConfigureAwait(false);
         return true;
-
     }
 
     IEnumerable<Task> CreateDispatchTasksForSubscribersWithoutEndpointName(ForwardPublishContext context, Subscriber[] subscribers)
@@ -47,7 +45,7 @@ class ForwardPublishStorageDrivenRule : ChainTerminator<ForwardPublishContext>
             .Where(s => s.Endpoint == null)
             .Select(x => new TransportOperation(new OutgoingMessage(context.MessageId, context.ForwardedHeaders, context.ReceivedBody), new UnicastAddressTag(x.TransportAddress)));
 
-        var contexts = operations.Select(o => new PostroutingContext(o, context));
+        var contexts = operations.Select(o => new PostroutingContext(null, o, context));
         var chain = context.Chains.Get<PostroutingContext>();
 
         var tasks = contexts.Select(c => chain.Invoke(c));
@@ -59,10 +57,14 @@ class ForwardPublishStorageDrivenRule : ChainTerminator<ForwardPublishContext>
         var matchingSubscribers = subscribers.Where(s => s.Endpoint != null && s.TransportAddress != null);
         var destinations = SelectDestinationsForEachEndpoint(matchingSubscribers);
 
-        var operations = destinations
-            .Select(x => new TransportOperation(new OutgoingMessage(context.MessageId, context.ForwardedHeaders, context.ReceivedBody), new UnicastAddressTag(x)));
+        var contexts = destinations
+            .Select(x =>
+            {
+                var message = new OutgoingMessage(context.MessageId, context.ForwardedHeaders, context.ReceivedBody);
+                var op = new TransportOperation(message, new UnicastAddressTag(x.Value));
+                return new PostroutingContext(x.Value, op, context);
+            });
 
-        var contexts = operations.Select(o => new PostroutingContext(o, context));
         var chain = context.Chains.Get<PostroutingContext>();
 
         var tasks = contexts.Select(c => chain.Invoke(c));
@@ -83,10 +85,10 @@ class ForwardPublishStorageDrivenRule : ChainTerminator<ForwardPublishContext>
         return tasks;
     }
 
-    IEnumerable<string> SelectDestinationsForEachEndpoint(IEnumerable<Subscriber> subscribers)
+    Dictionary<string, string> SelectDestinationsForEachEndpoint(IEnumerable<Subscriber> subscribers)
     {
         //Make sure we are sending only one to each transport destination. Might happen when there are multiple routing information sources.
-        var addresses = new HashSet<string>();
+        var addresses = new Dictionary<string, string>();
         Dictionary<string, List<string>> groups = null;
         foreach (var subscriber in subscribers)
         {
@@ -108,7 +110,7 @@ class ForwardPublishStorageDrivenRule : ChainTerminator<ForwardPublishContext>
             {
                 var instances = group.Value.ToArray();
                 var subscriber = distributionPolicy.GetDistributionStrategy(group.Key, DistributionStrategyScope.Publish).SelectDestination(instances);
-                addresses.Add(subscriber);
+                addresses.Add(group.Key, subscriber);
             }
         }
 

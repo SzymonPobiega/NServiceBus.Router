@@ -13,27 +13,37 @@
         public TransportOperation[] Messages { get; }
 
         /// <summary>
+        /// Optional name of logical destination endpoint.
+        /// </summary>
+        public string DestinationEndpoint { get; }
+
+        /// <summary>
         /// Creates new instance.
         /// </summary>
-        public PostroutingContext(TransportOperation message, string @interface, RootContext parent) : base(parent, @interface)
+        public PostroutingContext(string destinationEndpoint, TransportOperation message, string @interface, RootContext parent) 
+            : base(parent, @interface)
         {
             Messages = new[] { message };
+            DestinationEndpoint = destinationEndpoint;
         }
 
         /// <summary>
         /// Creates new instance.
         /// </summary>
-        public PostroutingContext(TransportOperation message, RuleContext parent) : base(parent)
+        public PostroutingContext(string destinationEndpoint, TransportOperation message, RuleContext parent) 
+            : base(parent)
         {
             Messages = new []{message};
+            DestinationEndpoint = destinationEndpoint;
         }
 
         /// <summary>
         /// Creates new instance.
         /// </summary>
-        public PostroutingContext(TransportOperation[] messages, RuleContext parent) : base(parent)
+        public PostroutingContext(string destinationEndpoint, TransportOperation[] messages, RuleContext parent) : base(parent)
         {
             Messages = messages;
+            DestinationEndpoint = destinationEndpoint;
         }
     }
 }
