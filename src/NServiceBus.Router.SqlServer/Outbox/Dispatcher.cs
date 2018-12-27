@@ -5,7 +5,6 @@
     using System.Threading;
     using System.Threading.Tasks;
     using Logging;
-    using Settings;
     using Transport;
 
     class Dispatcher : IModule
@@ -63,6 +62,10 @@
 
         public async Task Stop()
         {
+            if (tokenSource == null)
+            {
+                return;
+            }
             try
             {
                 //TODO: Do we need both?

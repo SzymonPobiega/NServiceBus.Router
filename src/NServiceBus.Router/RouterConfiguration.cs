@@ -3,7 +3,6 @@ namespace NServiceBus.Router
     
     using System;
     using System.Collections.Generic;
-    using Settings;
     using Transport;
 
     /// <summary>
@@ -39,14 +38,14 @@ namespace NServiceBus.Router
         public InterfaceConfiguration<T> AddInterface<T>(string name, Action<TransportExtensions<T>> customization) 
             where T : TransportDefinition, new()
         {
-            var ifaceConfig = new InterfaceConfiguration<T>(name, customization, Settings, EnableFeature);
+            var ifaceConfig = new InterfaceConfiguration<T>(name, customization, this);
             InterfaceFactories.Add(() => CreateInterface(ifaceConfig));
             return ifaceConfig;
         }
 
         Interface CreateInterface<T>(InterfaceConfiguration<T> ifaceConfig) where T : TransportDefinition, new()
         {
-            return ifaceConfig.Create(Name, "poison", autoCreateQueues, autoCreateQueuesIdentity, ImmediateRetries, DelayedRetries, CircuitBreakerThreshold, typeGenerator);
+            return ifaceConfig.Create(Name, "poison", autoCreateQueues, autoCreateQueuesIdentity, ImmediateRetries, DelayedRetries, CircuitBreakerThreshold, typeGenerator, Settings);
         }
 
         /// <summary>

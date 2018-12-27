@@ -13,7 +13,7 @@ class PublishPreroutingTerminator : ChainTerminator<PublishPreroutingContext>
         this.typeGenerator = typeGenerator;
     }
 
-    protected override Task Terminate(PublishPreroutingContext context)
+    protected override async Task<bool> Terminate(PublishPreroutingContext context)
     {
         var outgoingInterfaces = allInterfaces.Where(i => i != context.IncomingInterface);
 
@@ -26,6 +26,7 @@ class PublishPreroutingTerminator : ChainTerminator<PublishPreroutingContext>
                 return chain.Invoke(new ForwardPublishContext(iface, typeGenerator.GetType(context.Types.First()), context));
             });
 
-        return Task.WhenAll(forkTasks);
+        await Task.WhenAll(forkTasks).ConfigureAwait(false);
+        return true;
     }
 }

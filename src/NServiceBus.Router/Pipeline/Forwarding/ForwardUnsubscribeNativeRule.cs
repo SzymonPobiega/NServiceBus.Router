@@ -1,9 +1,8 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using NServiceBus.Router;
 using NServiceBus.Transport;
 
-class ForwardUnsubscribeNativeRule : IRule<ForwardUnsubscribeContext, ForwardUnsubscribeContext>
+class ForwardUnsubscribeNativeRule : ChainTerminator<ForwardUnsubscribeContext>
 {
     IManageSubscriptions subscriptionManager;
 
@@ -12,9 +11,10 @@ class ForwardUnsubscribeNativeRule : IRule<ForwardUnsubscribeContext, ForwardUns
         this.subscriptionManager = subscriptionManager;
     }
 
-    public async Task Invoke(ForwardUnsubscribeContext context, Func<ForwardUnsubscribeContext, Task> next)
+    protected override async Task<bool> Terminate(ForwardUnsubscribeContext context)
     {
         await subscriptionManager.Unsubscribe(context.MessageRuntimeType, context).ConfigureAwait(false);
-        await next(context).ConfigureAwait(false);
+
+        return true;
     }
 }

@@ -10,7 +10,7 @@ using NServiceBus.Transport;
 using NServiceBus.Unicast.Subscriptions;
 using NServiceBus.Unicast.Subscriptions.MessageDrivenSubscriptions;
 
-class ForwardPublishStorageDrivenRule : IRule<ForwardPublishContext, ForwardPublishContext>
+class ForwardPublishStorageDrivenRule : ChainTerminator<ForwardPublishContext>
 {
     ISubscriptionStorage subscriptionStorage;
     RawDistributionPolicy distributionPolicy;
@@ -21,7 +21,7 @@ class ForwardPublishStorageDrivenRule : IRule<ForwardPublishContext, ForwardPubl
         this.distributionPolicy = distributionPolicy;
     }
 
-    public async Task Invoke(ForwardPublishContext context, Func<ForwardPublishContext, Task> next)
+    protected override async Task<bool> Terminate(ForwardPublishContext context)
     {
         var typeObjects = context.Types.Select(t => new MessageType(t));
         var subscribers = (await subscriptionStorage.GetSubscriberAddressesForMessage(typeObjects, new ContextBag()).ConfigureAwait(false)).ToArray();
@@ -32,15 +32,20 @@ class ForwardPublishStorageDrivenRule : IRule<ForwardPublishContext, ForwardPubl
                 .Concat(CreateDispatchTasksForSubscribersWithEndpointNameOnly(context, subscribers))
                 .ToArray();
 
+        if (!tasks.Any())
+        {
+            return false;
+        }
         await Task.WhenAll(tasks).ConfigureAwait(false);
-        await next(context).ConfigureAwait(false);
+        return true;
+
     }
 
-    static IEnumerable<Task> CreateDispatchTasksForSubscribersWithoutEndpointName(ForwardPublishContext context, Subscriber[] subscribers)
+    IEnumerable<Task> CreateDispatchTasksForSubscribersWithoutEndpointName(ForwardPublishContext context, Subscriber[] subscribers)
     {
         var operations = subscribers
             .Where(s => s.Endpoint == null)
-            .Select(x => new TransportOperation(new OutgoingMessage(context.MessageId, context.ReceivedHeaders.Copy(), context.ReceivedBody), new UnicastAddressTag(x.TransportAddress)));
+            .Select(x => new TransportOperation(new OutgoingMessage(context.MessageId, context.ForwardedHeaders, context.ReceivedBody), new UnicastAddressTag(x.TransportAddress)));
 
         var contexts = operations.Select(o => new PostroutingContext(o, context));
         var chain = context.Chains.Get<PostroutingContext>();
@@ -55,7 +60,7 @@ class ForwardPublishStorageDrivenRule : IRule<ForwardPublishContext, ForwardPubl
         var destinations = SelectDestinationsForEachEndpoint(matchingSubscribers);
 
         var operations = destinations
-            .Select(x => new TransportOperation(new OutgoingMessage(context.MessageId, context.ReceivedHeaders.Copy(), context.ReceivedBody), new UnicastAddressTag(x)));
+            .Select(x => new TransportOperation(new OutgoingMessage(context.MessageId, context.ForwardedHeaders, context.ReceivedBody), new UnicastAddressTag(x)));
 
         var contexts = operations.Select(o => new PostroutingContext(o, context));
         var chain = context.Chains.Get<PostroutingContext>();
@@ -64,12 +69,12 @@ class ForwardPublishStorageDrivenRule : IRule<ForwardPublishContext, ForwardPubl
         return tasks;
     }
 
-    static IEnumerable<Task> CreateDispatchTasksForSubscribersWithEndpointNameOnly(ForwardPublishContext context, Subscriber[] subscribers)
+    IEnumerable<Task> CreateDispatchTasksForSubscribersWithEndpointNameOnly(ForwardPublishContext context, Subscriber[] subscribers)
     {
         var matchingSubscribers = subscribers.Where(s => s.Endpoint != null && s.TransportAddress == null);
         var contexts = matchingSubscribers.Select(s =>
         {
-            var message = new OutgoingMessage(context.MessageId, context.ReceivedHeaders.Copy(), context.ReceivedBody);
+            var message = new OutgoingMessage(context.MessageId, context.ForwardedHeaders, context.ReceivedBody);
             return new AnycastContext(s.Endpoint, message, DistributionStrategyScope.Publish, context);
         });
         var chain = context.Chains.Get<AnycastContext>();

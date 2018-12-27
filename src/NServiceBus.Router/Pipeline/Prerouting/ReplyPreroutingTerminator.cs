@@ -5,14 +5,16 @@ using NServiceBus.Router;
 
 class ReplyPreroutingTerminator : ChainTerminator<ReplyPreroutingContext>
 {
-    protected override Task Terminate(ReplyPreroutingContext context)
+    protected override async Task<bool> Terminate(ReplyPreroutingContext context)
     {
         var interfaces = context.Extensions.Get<IInterfaceChains>();
         var iface = InterfaceForReply(context);
         var chain = interfaces.GetChainsFor(iface);
         var forkContext = new ForwardReplyContext(iface, context);
 
-        return chain.Get<ForwardReplyContext>().Invoke(forkContext);
+        await chain.Get<ForwardReplyContext>().Invoke(forkContext).ConfigureAwait(false);
+
+        return true;
     }
 
     static string InterfaceForReply(ReplyPreroutingContext context)

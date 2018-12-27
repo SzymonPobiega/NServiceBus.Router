@@ -9,7 +9,7 @@ class SubscribePreroutingTerminator : ChainTerminator<SubscribePreroutingContext
         this.routingProtocol = routingProtocol;
         this.typeGenerator = typeGenerator;
     }
-    protected override Task Terminate(SubscribePreroutingContext context)
+    protected override async Task<bool> Terminate(SubscribePreroutingContext context)
     {
         if (!context.Destinations.Any())
         {
@@ -28,7 +28,9 @@ class SubscribePreroutingTerminator : ChainTerminator<SubscribePreroutingContext
                 return chain.Invoke(new ForwardSubscribeContext(iface, routes, typeGenerator.GetType(context.MessageType), context));
             });
 
-        return Task.WhenAll(forkTasks);
+        await Task.WhenAll(forkTasks).ConfigureAwait(false);
+
+        return true;
     }
 
     IRoutingProtocol routingProtocol;

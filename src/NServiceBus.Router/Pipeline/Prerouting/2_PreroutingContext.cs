@@ -36,12 +36,4 @@
         /// </summary>
         public byte[] Body { get; set; }
     }
-
-    class PreroutingTerminator : ChainTerminator<PreroutingContext>
-    {
-        protected override Task Terminate(PreroutingContext context)
-        {
-            return Task.CompletedTask;
-        }
-    }
 }

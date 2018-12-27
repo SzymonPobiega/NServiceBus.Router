@@ -12,15 +12,20 @@ public class InMemorySubscriptionStorage : ISubscriptionStorage
     {
         var dict = storage.GetOrAdd(messageType, type => new ConcurrentDictionary<string, Subscriber>(StringComparer.OrdinalIgnoreCase));
 
-        dict.AddOrUpdate(subscriber.TransportAddress, _ => subscriber, (_, __) => subscriber);
+        dict.AddOrUpdate(BuildKey(subscriber), _ => subscriber, (_, __) => subscriber);
         return Task.CompletedTask;
+    }
+
+    static string BuildKey(Subscriber subscriber)
+    {
+        return $"{subscriber.TransportAddress ?? ""}_{subscriber.Endpoint ?? ""}";
     }
 
     public Task Unsubscribe(Subscriber subscriber, MessageType messageType, ContextBag context)
     {
         if (storage.TryGetValue(messageType, out var dict))
         {
-            dict.TryRemove(subscriber.TransportAddress, out var _);
+            dict.TryRemove(BuildKey(subscriber), out var _);
         }
         return Task.CompletedTask;
     }

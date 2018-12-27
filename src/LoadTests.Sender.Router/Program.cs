@@ -38,7 +38,7 @@ namespace LoadTests.Sender.Router
                 t.Transactions(TransportTransactionMode.SendsAtomicWithReceive);
             });
 
-            sqlInterface.UseSubscriptionPersistence(new SqlSubscriptionStorage(() => new SqlConnection(sqlConnectionString), "SenderRouter", new SqlDialect.MsSqlServer(), null));
+            sqlInterface.EnableMessageDrivenPublishSubscribe(new SqlSubscriptionStorage(() => new SqlConnection(sqlConnectionString), "SenderRouter", new SqlDialect.MsSqlServer(), null));
             sqlInterface.EnableDeduplication(linkInterface.Name, "Receiver.Router", () => new SqlConnection(sqlConnectionString), epochSize);
 
             var routingProtocol = routerConfig.UseStaticRoutingProtocol();
