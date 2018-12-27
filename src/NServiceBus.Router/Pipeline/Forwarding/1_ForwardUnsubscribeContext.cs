@@ -2,7 +2,6 @@
 {
     using System;
     using System.Collections.Generic;
-    using System.Threading.Tasks;
 
     /// <summary>
     /// Defines the context for the forward unsubscribe chain.
@@ -33,14 +32,6 @@
             Routes = routes;
             MessageType = parentContext.MessageType;
             MessageRuntimeType = runtimeType;
-        }
-    }
-
-    class ForwardUnsubscribeTerminator : ChainTerminator<ForwardUnsubscribeContext>
-    {
-        protected override Task Terminate(ForwardUnsubscribeContext context)
-        {
-            return Task.CompletedTask;
         }
     }
 }

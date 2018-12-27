@@ -5,7 +5,6 @@
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
-    using Settings;
     using Transport;
 
     class OutboxPersisterCollection : IModule

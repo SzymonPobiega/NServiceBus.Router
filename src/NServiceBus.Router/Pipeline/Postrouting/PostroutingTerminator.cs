@@ -14,13 +14,15 @@ class PostroutingTerminator : ChainTerminator<PostroutingContext>
         this.endpointName = dispatcher.EndpointName;
     }
 
-    protected override Task Terminate(PostroutingContext context)
+    protected override async Task<bool> Terminate(PostroutingContext context)
     {
         foreach (var operation in context.Messages)
         {
             AddTrace(operation);
         }
-        return dispatcher.Dispatch(new TransportOperations(context.Messages), context.Get<TransportTransaction>(), context);
+        await dispatcher.Dispatch(new TransportOperations(context.Messages), context.Get<TransportTransaction>(), context)
+            .ConfigureAwait(false);
+        return true;
     }
 
     void AddTrace(TransportOperation op)

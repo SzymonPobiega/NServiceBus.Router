@@ -74,8 +74,14 @@ namespace NServiceBus.Router
         /// </summary>
         public IChain<TInput> Terminate()
         {
-            var terminator = allRules.Single(r => r.Key.GetInputContext() == typeof(T) && r.Key.GetOutputContext() == typeof(ChainTerminator<T>.ITerminatingContext));
-            rules.Add(terminator.Value(context));
+            var terminatorsFactories = allRules.Where(r => r.Key.GetInputContext() == typeof(T) && r.Key.GetOutputContext() == typeof(ChainTerminator<T>.ITerminatingContext));
+
+            var terminators = terminatorsFactories.Select(f => f.Value(context)).Cast<IRule<T, ChainTerminator<T>.ITerminatingContext>>().ToList();
+            if (!terminators.Any())
+            {
+                throw new Exception($"A chain has to have at least one terminator: {typeof(T).Name}.");
+            }
+            rules.Add(new TerminatorInvocationRule<T>(terminators));
 
             return new Chain<TInput>(rules.ToArray().CreatePipelineExecutionFuncFor<TInput>());
         }

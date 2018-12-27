@@ -12,21 +12,23 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
     using AcceptanceTesting.Customization;
 
     [TestFixture]
-    public class When_sending_via_two_routers : NServiceBusAcceptanceTest
+    public class When_publishing_via_two_routers_native_pubsub : NServiceBusAcceptanceTest
     {
         const string ConnectionString = "data source = (local); initial catalog=test1; integrated security=true";
 
         [Test]
-        public async Task Should_deliver_the_reply_back()
+        public async Task Should_deliver_the_event_in_message_driven_mode()
         {
-            await Scenario.Define<Context>()
+            var result = await Scenario.Define<Context>()
                 .WithRouter("Green-Blue", cfg =>
                 {
                     var deduplicationConfig = cfg.ConfigureDeduplication();
 #pragma warning disable 618
                     deduplicationConfig.EnableInstaller(true);
 #pragma warning restore 618
-                    var linkInterface = cfg.AddInterface<TestTransport>("Blue", t => t.BrokerBravo()).InMemorySubscriptions();
+                    var linkInterface = cfg.AddInterface<TestTransport>("Blue", t => t.BrokerYankee());
+                    //linkInterface.DisableNativePubSub();
+                    linkInterface.EnableMessageDrivenPublishSubscribe(new InMemorySubscriptionStorage());
 
                     var sqlInterface = cfg.AddInterface<SqlServerTransport>("Green", t =>
                     {
@@ -47,7 +49,9 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
                     deduplicationConfig.EnableInstaller(true);
 #pragma warning restore 618
 
-                    var linkInterface = cfg.AddInterface<TestTransport>("Blue", t => t.BrokerBravo()).InMemorySubscriptions();
+                    var linkInterface = cfg.AddInterface<TestTransport>("Blue", t => t.BrokerYankee());
+                    //linkInterface.DisableNativePubSub();
+                    linkInterface.EnableMessageDrivenPublishSubscribe(new InMemorySubscriptionStorage());
 
                     var sqlInterface = cfg.AddInterface<SqlServerTransport>("Red", t =>
                     {
@@ -61,13 +65,16 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
                     routeTable.AddForwardRoute("Blue", "Red");
                     routeTable.AddForwardRoute("Red", "Blue", "Green-Blue");
                 })
-                .WithEndpoint<GreenEndpoint>(c => c.When(s => s.Send(new GreenRequest
+                .WithEndpoint<GreenEndpoint>(c => c.When(ctx => ctx.EventSubscribed, s => s.Send(new MyMessage
                 {
                     Counter = 0
                 })))
                 .WithEndpoint<RedEndpoint>()
-                .Done(c => c.Counter > 20)
+                .Done(c => c.Counter > 5)
                 .Run(TimeSpan.FromSeconds(60));
+
+            Assert.IsTrue(result.AreSendsDeduplicated);
+            Assert.IsTrue(result.ArePublishesDeduplicated);
         }
 
         class Context : ScenarioContext
@@ -75,6 +82,9 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
             int counter;
 
             public int Counter => Volatile.Read(ref counter);
+            public bool EventSubscribed { get; set; }
+            public bool AreSendsDeduplicated { get; set; }
+            public bool ArePublishesDeduplicated { get; set; }
 
             public int IncrementCounter()
             {
@@ -91,23 +101,26 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
                     var transport = c.UseTransport<SqlServerTransport>();
                     transport.ConnectionString(ConnectionString);
                     var bridge = transport.Routing().ConnectToRouter("Green-Blue");
-                    bridge.RouteToEndpoint(typeof(GreenRequest), Conventions.EndpointNamingConvention(typeof(RedEndpoint)));
+                    bridge.RouteToEndpoint(typeof(MyMessage), Conventions.EndpointNamingConvention(typeof(RedEndpoint)));
+                    bridge.RegisterPublisher(typeof(MyEvent), Conventions.EndpointNamingConvention(typeof(RedEndpoint)));
                 });
             }
 
-            class GreenResponseHandler : IHandleMessages<GreenResponse>
+            class MyEventHandler : IHandleMessages<MyEvent>
             {
                 Context scenarioContext;
 
-                public GreenResponseHandler(Context scenarioContext)
+                public MyEventHandler(Context scenarioContext)
                 {
                     this.scenarioContext = scenarioContext;
                 }
 
-                public Task Handle(GreenResponse response, IMessageHandlerContext context)
+                public Task Handle(MyEvent response, IMessageHandlerContext context)
                 {
+                    scenarioContext.ArePublishesDeduplicated = context.MessageHeaders.ContainsKey(RouterDeduplicationHeaders.SequenceNumber);
+
                     var incremented = scenarioContext.IncrementCounter();
-                    return context.Send(new GreenRequest
+                    return context.Send(new MyMessage
                     {
                         Counter = incremented
                     });
@@ -123,16 +136,28 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
                 {
                     var transport = c.UseTransport<SqlServerTransport>();
                     transport.ConnectionString(ConnectionString);
+
+                    c.OnEndpointSubscribed<Context>((args, context) =>
+                    {
+                        context.EventSubscribed = true;
+                    });
                 });
             }
 
-            class GreenRequestHandler : IHandleMessages<GreenRequest>
+            class MyMessageHandler : IHandleMessages<MyMessage>
             {
-                public Task Handle(GreenRequest request, IMessageHandlerContext context)
+                Context scenarioContext;
+
+                public MyMessageHandler(Context scenarioContext)
                 {
-                    var correlation = context.MessageHeaders[Headers.CorrelationId];
-                    Console.WriteLine(correlation);
-                    return context.Reply(new GreenResponse
+                    this.scenarioContext = scenarioContext;
+                }
+
+                public Task Handle(MyMessage request, IMessageHandlerContext context)
+                {
+                    scenarioContext.AreSendsDeduplicated = context.MessageHeaders.ContainsKey(RouterDeduplicationHeaders.SequenceNumber);
+
+                    return context.Publish(new MyEvent
                     {
                         Counter = request.Counter
                     });
@@ -140,7 +165,7 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
             }
         }
 
-        class GreenRequest : IMessage
+        class MyMessage : ICommand
         {
             public int Counter { get; set; }
 
@@ -150,7 +175,7 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
             }
         }
 
-        class GreenResponse : IMessage
+        class MyEvent : IEvent
         {
             public int Counter { get; set; }
 

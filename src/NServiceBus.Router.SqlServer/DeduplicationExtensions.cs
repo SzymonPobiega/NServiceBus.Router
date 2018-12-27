@@ -18,10 +18,10 @@
         /// <param name="epochSize">Size of an epoch.</param>
         public static void EnableDeduplication(this InterfaceConfiguration<SqlServerTransport> iface, string outgoingInterface, string destinationRouter, Func<SqlConnection> connectionFactory, int epochSize)
         {
-            var settings = iface.Settings.GetOrCreate<DeduplicationSettings>();
+            var settings = iface.RouterConfiguration.Settings.GetOrCreate<DeduplicationSettings>();
             settings.EnableLink(iface.Name, outgoingInterface, destinationRouter, connectionFactory, epochSize);
 
-            iface.EnableFeature(typeof(DeduplicationFeature));
+            iface.RouterConfiguration.EnableFeature(typeof(DeduplicationFeature));
         }
 
         /// <summary>

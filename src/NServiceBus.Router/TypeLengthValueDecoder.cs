@@ -12,6 +12,52 @@ static class TLV
         return existingTLV.TrimEnd('|') + "|" + Encode(type, value);
     }
 
+    public static bool TryDecodeTLV(this string tlvString, Action<string, string> valueCallback)
+    {
+        var remaining = tlvString;
+        while (true)
+        {
+            var next = remaining.IndexOf("|", StringComparison.Ordinal);
+            if (next < 0)
+            {
+                return false;
+            }
+            var type = remaining.Substring(0, next);
+            remaining = remaining.Substring(next + 1);
+
+            next = remaining.IndexOf("|", StringComparison.Ordinal);
+            if (next < 0)
+            {
+                return false;
+            }
+            var lengthString = remaining.Substring(0, next);
+            if (!int.TryParse(lengthString, out var length))
+            {
+                return false;
+            }
+            remaining = remaining.Substring(next + 1);
+            if (remaining.Length < length)
+            {
+                return false;
+            }
+
+            var value = remaining.Substring(0, length);
+
+            valueCallback(type, value);
+
+            remaining = remaining.Substring(length);
+            if (remaining == "")
+            {
+                return true;
+            }
+            if (!remaining.StartsWith("|"))
+            {
+                return false;
+            }
+            remaining = remaining.Substring(1);
+        }
+    }
+
     public static void DecodeTLV(this string tlvString, Action<string, string> valueCallback)
     {
         var remaining = tlvString;
@@ -31,16 +77,10 @@ static class TLV
                 throw new Exception($"Expected length followed by a delimiter, found '{remaining}'");
             }
             var lengthString = remaining.Substring(0, next);
-            int length;
-            try
-            {
-                length = int.Parse(lengthString);
-            }
-            catch (Exception)
+            if (!int.TryParse(lengthString, out var length))
             {
                 throw new Exception($"Expected length to be a valid integer, found '{lengthString}'");
             }
-
             remaining = remaining.Substring(next + 1);
             if (remaining.Length < length)
             {

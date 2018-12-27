@@ -1,11 +1,10 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using NServiceBus;
 using NServiceBus.Router;
 
-class PreroutingToSendPreroutingFork : IRule<PreroutingContext, PreroutingContext>
+class PreroutingToSendPreroutingFork : ChainTerminator<PreroutingContext>
 {
-    public async Task Invoke(PreroutingContext context, Func<PreroutingContext, Task> next)
+    protected override async Task<bool> Terminate(PreroutingContext context)
     {
         if (context.Intent == MessageIntentEnum.Send)
         {
@@ -13,8 +12,10 @@ class PreroutingToSendPreroutingFork : IRule<PreroutingContext, PreroutingContex
                 .Invoke(new SendPreroutingContext(context))
                 .ConfigureAwait(false);
 
+            return true;
         }
-        await next(context).ConfigureAwait(false);
+
+        return false;
     }
 }
 

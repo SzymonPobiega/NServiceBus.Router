@@ -1,10 +1,9 @@
-﻿using System;
-using System.Linq;
+﻿using System.Linq;
 using System.Threading.Tasks;
 using NServiceBus;
 using NServiceBus.Router;
 
-class ForwardUnsubscribeMessageDrivenRule : IRule<ForwardUnsubscribeContext, ForwardUnsubscribeContext>
+class ForwardUnsubscribeMessageDrivenRule : ChainTerminator<ForwardUnsubscribeContext>
 {
     string localAddress;
     string localEndpoint;
@@ -15,16 +14,23 @@ class ForwardUnsubscribeMessageDrivenRule : IRule<ForwardUnsubscribeContext, For
         this.localEndpoint = localEndpoint;
     }
 
-    public async Task Invoke(ForwardUnsubscribeContext context, Func<ForwardUnsubscribeContext, Task> next)
+    protected override async Task<bool> Terminate(ForwardUnsubscribeContext context)
     {
         var immediateSubscribes = context.Routes.Where(r => r.Gateway == null);
         var forkContexts = immediateSubscribes.Select(r =>
             new MulticastContext(r.Destination,
-                MessageDrivenPubSub.CreateMessage(null, context.MessageType, localAddress, localEndpoint, MessageIntentEnum.Unsubscribe), context));
+                MessageDrivenPubSub.CreateMessage(null, context.MessageType, localAddress, localEndpoint, MessageIntentEnum.Unsubscribe), context))
+            .ToArray();
 
-        var chain = context.Chains.Get<MulticastContext>();
-        var forkTasks = forkContexts.Select(c => chain.Invoke(c));
-        await Task.WhenAll(forkTasks).ConfigureAwait(false);
-        await next(context);
+        if (forkContexts.Any())
+        {
+            var chain = context.Chains.Get<MulticastContext>();
+            var forkTasks = forkContexts.Select(c => chain.Invoke(c));
+            await Task.WhenAll(forkTasks).ConfigureAwait(false);
+
+            return true;
+        }
+
+        return false;
     }
 }

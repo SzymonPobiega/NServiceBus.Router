@@ -1,7 +1,6 @@
 ﻿namespace NServiceBus.Router
 {
     using System.Collections.Generic;
-    using System.Threading.Tasks;
 
     /// <summary>
     /// Defines the context for the forward send chain.
@@ -17,7 +16,6 @@
             Routes = routes;
             ReceivedHeaders = parentContext.Headers;
             ReceivedBody = parentContext.Body;
-            MessageId = parentContext.MessageId;
         }
 
         /// <summary>
@@ -34,18 +32,5 @@
         /// The headers associated with the received message.
         /// </summary>
         public byte[] ReceivedBody { get; }
-
-        /// <summary>
-        /// The ID of the received message.
-        /// </summary>
-        public string MessageId { get; }
-    }
-
-    class ForwardSendTerminator : ChainTerminator<ForwardSendContext>
-    {
-        protected override Task Terminate(ForwardSendContext context)
-        {
-            return Task.CompletedTask;
-        }
     }
 }

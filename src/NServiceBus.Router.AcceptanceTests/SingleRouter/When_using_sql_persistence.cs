@@ -23,8 +23,8 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
                 {
-                    cfg.AddInterface<TestTransport>("A", t => t.BrokerAlpha()).UseSubscriptionPersistence(GetSubscriptionStorage("A"));
-                    cfg.AddInterface<TestTransport>("D", t => t.BrokerBravo()).UseSubscriptionPersistence(GetSubscriptionStorage("D"));
+                    cfg.AddInterface<TestTransport>("A", t => t.BrokerAlpha()).EnableMessageDrivenPublishSubscribe(GetSubscriptionStorage("A"));
+                    cfg.AddInterface<TestTransport>("D", t => t.BrokerBravo()).EnableMessageDrivenPublishSubscribe(GetSubscriptionStorage("D"));
 
                     cfg.UseStaticRoutingProtocol().AddForwardRoute("D", "A");
                 })

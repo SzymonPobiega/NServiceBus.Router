@@ -11,7 +11,10 @@ static class MessageDrivenPubSub
 
         subscriptionMessage.Headers[Headers.SubscriptionMessageType] = messageType;
         subscriptionMessage.Headers[Headers.ReplyToAddress] = localAddress;
-        subscriptionMessage.Headers[Headers.SubscriberTransportAddress] = localAddress;
+        if (localAddress != null)
+        {
+            subscriptionMessage.Headers[Headers.SubscriberTransportAddress] = localAddress;
+        }
         subscriptionMessage.Headers[Headers.SubscriberEndpoint] = localEndpoint;
         subscriptionMessage.Headers[Headers.TimeSent] = DateTimeExtensions.ToWireFormattedString(DateTime.UtcNow);
         subscriptionMessage.Headers[Headers.NServiceBusVersion] = "6.3.1"; //The code has been copied from 6.3.1

@@ -5,7 +5,6 @@ using NServiceBus.Router;
 using NServiceBus.Configuration.AdvancedExtensibility;
 using NServiceBus.Logging;
 using NServiceBus.Raw;
-using NServiceBus.Settings;
 using NServiceBus.Transport;
 
 interface Interface
@@ -39,7 +38,7 @@ class Interface<T> : Interface where T : TransportDefinition, new()
             immediateRetries, delayedRetries, circuitBreakerThreshold, autoCreateQueues, autoCreateQueuesIdentity);
     }
 
-    static void SetTransportSpecificFlags(SettingsHolder settings, string poisonQueue)
+    static void SetTransportSpecificFlags(NServiceBus.Settings.SettingsHolder settings, string poisonQueue)
     {
         settings.Set("errorQueue", poisonQueue);
         settings.Set("RabbitMQ.RoutingTopologySupportsDelayedDelivery", true);
