@@ -45,7 +45,7 @@ class ForwardReplyRule : ChainTerminator<ForwardReplyContext>
             var operation = new TransportOperation(outgoingMessage, new UnicastAddressTag(replyTo));
 
             var chain = context.Chains.Get<PostroutingContext>();
-            var forkContext = new PostroutingContext(operation, context);
+            var forkContext = new PostroutingContext(null, operation, context);
             await chain.Invoke(forkContext).ConfigureAwait(false);
 
             return true;
