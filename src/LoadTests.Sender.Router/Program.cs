@@ -35,6 +35,7 @@ namespace LoadTests.Sender.Router
 
             var sqlInterface = routerConfig.AddInterface<SqlServerTransport>("SQL", t =>
             {
+                t.ConnectionString(sqlConnectionString);
                 t.Transactions(TransportTransactionMode.SendsAtomicWithReceive);
             });
 
@@ -43,6 +44,8 @@ namespace LoadTests.Sender.Router
 
             var routingProtocol = routerConfig.UseStaticRoutingProtocol();
             routingProtocol.AddForwardRoute("SQL", "Rabbit", "Receiver.Router");
+
+            routerConfig.AddRule(_ => new RandomDuplicator());
 
             var router = Router.Create(routerConfig);
 
