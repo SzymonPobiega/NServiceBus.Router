@@ -10,14 +10,14 @@ using NServiceBus.Unicast.Transport;
 
 class RouterSubscribeBehavior : Behavior<ISubscribeContext>
 {
-    public RouterSubscribeBehavior(string subscriberAddress, string subscriberEndpoint, string routerAddress, IDispatchMessages dispatcher, Dictionary<Type, string> publisherTable, bool invokeTerminator)
+    public RouterSubscribeBehavior(string subscriberAddress, string subscriberEndpoint, string routerAddress, IDispatchMessages dispatcher, Dictionary<Type, string> publisherTable, bool nativePubSub)
     {
         this.subscriberAddress = subscriberAddress;
         this.subscriberEndpoint = subscriberEndpoint;
         this.routerAddress = routerAddress;
         this.dispatcher = dispatcher;
         this.publisherTable = publisherTable;
-        this.invokeTerminator = invokeTerminator;
+        this.nativePubSub = nativePubSub;
     }
 
     public override async Task Invoke(ISubscribeContext context, Func<Task> next)
@@ -25,7 +25,6 @@ class RouterSubscribeBehavior : Behavior<ISubscribeContext>
         var eventType = context.EventType;
         if (publisherTable.TryGetValue(eventType, out var publisherEndpoint))
         {
-
             Logger.Debug($"Sending subscribe request for {eventType.AssemblyQualifiedName} to router queue {routerAddress} to be forwarded to {publisherEndpoint}");
 
             var subscriptionMessage = ControlMessageFactory.Create(MessageIntentEnum.Subscribe);
@@ -41,9 +40,13 @@ class RouterSubscribeBehavior : Behavior<ISubscribeContext>
             var transportOperation = new TransportOperation(subscriptionMessage, new UnicastAddressTag(routerAddress));
             var transportTransaction = context.Extensions.GetOrCreate<TransportTransaction>();
             await dispatcher.Dispatch(new TransportOperations(transportOperation), transportTransaction, context.Extensions).ConfigureAwait(false);
-        }
 
-        if (invokeTerminator)
+            if (nativePubSub)
+            {
+                await next().ConfigureAwait(false);
+            }
+        }
+        else
         {
             await next().ConfigureAwait(false);
         }
@@ -51,7 +54,7 @@ class RouterSubscribeBehavior : Behavior<ISubscribeContext>
 
     IDispatchMessages dispatcher;
     Dictionary<Type, string> publisherTable;
-    bool invokeTerminator;
+    bool nativePubSub;
     string subscriberAddress;
     string subscriberEndpoint;
     string routerAddress;
