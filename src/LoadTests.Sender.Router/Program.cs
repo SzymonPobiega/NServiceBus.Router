@@ -35,6 +35,7 @@ namespace LoadTests.Sender.Router
 
             var sqlInterface = routerConfig.AddInterface<SqlServerTransport>("SQL", t =>
             {
+                t.ConnectionString(sqlConnectionString);
                 t.Transactions(TransportTransactionMode.SendsAtomicWithReceive);
             });
 
