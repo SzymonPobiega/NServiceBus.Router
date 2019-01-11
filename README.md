@@ -2,7 +2,13 @@
 
 # NServiceBus.Router
 
-Cross-transport, cross-site and possibly cross-cloud router component for NServiceBus
+Cross-transport, cross-site and cross-cloud router component for NServiceBus.
+
+## Documentation
+
+For documentation about the usage patterns, go to [Particular Platform Docs](https://docs.particular.net/nservicebus/router/).
+
+For documentation about the design, to [wiki](https://github.com/SzymonPobiega/NServiceBus.Router/wiki).
 
 ## Icon
 

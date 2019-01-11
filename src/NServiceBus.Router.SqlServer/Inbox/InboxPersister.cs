@@ -33,7 +33,7 @@
 
             if (cachedLinkState.IsFromNextEpoch(seq))
             {
-                var freshLinkState = await linkStateTable.Get(sourceKey, conn).ConfigureAwait(false);
+                var freshLinkState = await linkStateTable.Get(sourceKey, conn, trans).ConfigureAwait(false);
                 UpdateCachedLinkState(freshLinkState);
                 cachedLinkState = linkState;
             }
@@ -58,7 +58,7 @@
             {
                 if (e.Number == 547) //Constraint violation
                 {
-                    var freshLinkState = await linkStateTable.Get(sourceKey, conn).ConfigureAwait(false);
+                    var freshLinkState = await linkStateTable.Get(sourceKey, conn, trans).ConfigureAwait(false);
                     UpdateCachedLinkState(freshLinkState);
                     if (freshLinkState.IsDuplicate(seq))
                     {
@@ -92,7 +92,7 @@
             using (var conn = connectionFactory())
             {
                 await conn.OpenAsync().ConfigureAwait(false);
-                linkState = await linkStateTable.Get(sourceKey, conn).ConfigureAwait(false);
+                linkState = await linkStateTable.Get(sourceKey, conn, null).ConfigureAwait(false);
             }
         }
 
@@ -123,7 +123,7 @@
         public async Task<LinkState> Advance(long nextEpoch, long nextLo, long nextHi, SqlConnection conn)
         {
             //Let's actually check if our values are correct.
-            var queriedLinkState = await linkStateTable.Get(sourceKey, conn);
+            var queriedLinkState = await linkStateTable.Get(sourceKey, conn, null);
 
             if (!queriedLinkState.Initialized)
             {

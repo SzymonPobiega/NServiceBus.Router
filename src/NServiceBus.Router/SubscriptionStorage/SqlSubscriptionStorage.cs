@@ -52,6 +52,19 @@
         }
 
         /// <summary>
+        /// Drops the required schema objects.
+        /// </summary>
+        public async Task Uninstall()
+        {
+            using (var connection = await connectionBuilder.OpenConnection().ConfigureAwait(false))
+            using (var transaction = connection.BeginTransaction())
+            {
+                await sqlDialect.ExecuteTableCommand(connection, transaction, SubscriptionScriptBuilder.BuildDropScript(sqlDialect), tablePrefix);
+                transaction.Commit();
+            }
+        }
+
+        /// <summary>
         /// Subscribes the given client to messages of a given type.
         /// </summary>
         public async Task Subscribe(Subscriber subscriber, MessageType messageType, ContextBag context)

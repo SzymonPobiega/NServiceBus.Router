@@ -10,12 +10,9 @@ namespace NServiceBus.Router
     public class ChainBuilder
     {
         IRuleCreationContext context;
-        Dictionary<Type, Func<IRuleCreationContext, IRule>> allRules;
+        List<RuleRegistration> allRules;
 
-        /// <summary>
-        /// Creates new instance.
-        /// </summary>
-        public ChainBuilder(IRuleCreationContext context, Dictionary<Type, Func<IRuleCreationContext, IRule>> allRules)
+        internal ChainBuilder(IRuleCreationContext context, List<RuleRegistration> allRules)
         {
             this.context = context;
             this.allRules = allRules;
@@ -28,8 +25,8 @@ namespace NServiceBus.Router
         public ChainBuilder<T, T> Begin<T>() where T : IRuleContext
         {
             var rules = allRules
-                .Where(r => r.Key.GetInputContext() == typeof(T) && r.Key.GetOutputContext() == typeof(T))
-                .Select(r => r.Value(context))
+                .Where(r => r.Type.GetInputContext() == typeof(T) && r.Type.GetOutputContext() == typeof(T))
+                .Select(r => r.Constructor(context))
                 .ToList();
 
             return new ChainBuilder<T, T>(allRules, rules, context);
@@ -43,11 +40,11 @@ namespace NServiceBus.Router
         where TInput : IRuleContext
         where T : IRuleContext
     {
-        Dictionary<Type, Func<IRuleCreationContext, IRule>> allRules;
+        List<RuleRegistration> allRules;
         List<IRule> rules;
         IRuleCreationContext context;
 
-        internal ChainBuilder(Dictionary<Type, Func<IRuleCreationContext, IRule>> allRules, List<IRule> rules, IRuleCreationContext context)
+        internal ChainBuilder(List<RuleRegistration> allRules, List<IRule> rules, IRuleCreationContext context)
         {
             this.allRules = allRules;
             this.rules = rules;
@@ -60,11 +57,11 @@ namespace NServiceBus.Router
         /// <typeparam name="TNext">Section type.</typeparam>
         public ChainBuilder<TInput, TNext> AddSection<TNext>() where TNext : IRuleContext
         {
-            var connector = allRules.Single(r => r.Key.GetInputContext() == typeof(T) && r.Key.GetOutputContext() == typeof(TNext));
-            var chain = allRules.Where(r => r.Key.GetInputContext() == typeof(TNext) && r.Key.GetOutputContext() == typeof(TNext));
+            var connector = allRules.Single(r => r.Type.GetInputContext() == typeof(T) && r.Type.GetOutputContext() == typeof(TNext));
+            var chain = allRules.Where(r => r.Type.GetInputContext() == typeof(TNext) && r.Type.GetOutputContext() == typeof(TNext));
 
-            rules.Add(connector.Value(context));
-            rules.AddRange(chain.Select(r => r.Value(context)));
+            rules.Add(connector.Constructor(context));
+            rules.AddRange(chain.Select(r => r.Constructor(context)));
 
             return new ChainBuilder<TInput, TNext>(allRules, rules, context);
         }
@@ -74,9 +71,9 @@ namespace NServiceBus.Router
         /// </summary>
         public IChain<TInput> Terminate()
         {
-            var terminatorsFactories = allRules.Where(r => r.Key.GetInputContext() == typeof(T) && r.Key.GetOutputContext() == typeof(ChainTerminator<T>.ITerminatingContext));
+            var terminatorsFactories = allRules.Where(r => r.Type.GetInputContext() == typeof(T) && r.Type.GetOutputContext() == typeof(ChainTerminator<T>.ITerminatingContext));
 
-            var terminators = terminatorsFactories.Select(f => f.Value(context)).Cast<IRule<T, ChainTerminator<T>.ITerminatingContext>>().ToList();
+            var terminators = terminatorsFactories.Select(f => f.Constructor(context)).Cast<IRule<T, ChainTerminator<T>.ITerminatingContext>>().ToList();
             if (!terminators.Any())
             {
                 throw new Exception($"A chain has to have at least one terminator: {typeof(T).Name}.");

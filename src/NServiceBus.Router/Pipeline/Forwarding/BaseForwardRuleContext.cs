@@ -1,7 +1,6 @@
 ﻿namespace NServiceBus.Router
 {
     using System.Collections.Generic;
-    using Transport;
 
     /// <summary>
     /// The base context class for all forwarding group chains.

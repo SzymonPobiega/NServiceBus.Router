@@ -40,8 +40,13 @@ class RouterUnsubscribeBehavior : Behavior<IUnsubscribeContext>
             var transportOperation = new TransportOperation(subscriptionMessage, new UnicastAddressTag(routerAddress));
             var transportTransaction = context.Extensions.GetOrCreate<TransportTransaction>();
             await dispatcher.Dispatch(new TransportOperations(transportOperation), transportTransaction, context.Extensions).ConfigureAwait(false);
+
+            if (invokeTerminator)
+            {
+                await next().ConfigureAwait(false);
+            }
         }
-        if (invokeTerminator)
+        else
         {
             await next().ConfigureAwait(false);
         }

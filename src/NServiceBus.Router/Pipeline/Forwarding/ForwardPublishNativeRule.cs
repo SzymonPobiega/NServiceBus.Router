@@ -11,7 +11,7 @@ class ForwardPublishNativeRule : ChainTerminator<ForwardPublishContext>
         var outgoingMessage = new OutgoingMessage(context.MessageId, context.ForwardedHeaders, context.ReceivedBody);
         var operation = new TransportOperation(outgoingMessage, addressTag);
 
-        var forkContext = new PostroutingContext(operation, context);
+        var forkContext = new PostroutingContext(null, operation, context);
         var chain = context.Chains.Get<PostroutingContext>();
         await chain.Invoke(forkContext).ConfigureAwait(false);
 

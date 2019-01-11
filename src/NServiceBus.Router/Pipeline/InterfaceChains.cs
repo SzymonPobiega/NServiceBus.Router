@@ -20,8 +20,7 @@ class InterfaceChains : IInterfaceChains
 
     public void InitializeInterface(string interfaceName, IRuleCreationContext context)
     {
-        var applicableRules = rules.Where(r => r.Condition(context))
-            .ToDictionary(r => r.Type, r => r.Constructor);
+        var applicableRules = rules.Where(r => r.Condition(context)).ToList();
 
         var chains = new Chains(new ChainBuilder(context, applicableRules), chainRegistrations);
         interfaceMap[interfaceName] = chains;
