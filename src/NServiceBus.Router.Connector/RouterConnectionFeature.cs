@@ -24,17 +24,23 @@ class RouterConnectionFeature : Feature
         var routes = settings.SendRouteTable.Select(x => new RouteTableEntry(x.Key, route)).ToList();
         unicastRouteTable.AddOrReplaceRoutes("NServiceBus.Router", routes);
 
-        var distributorAddress = context.Settings.GetOrDefault<string>("LegacyDistributor.Address");
-        var subscriberAddress = distributorAddress ?? context.Settings.LocalAddress();
-
-        var publisherAddress = PublisherAddress.CreateFromPhysicalAddresses(settings.RouterAddress);
-        publishers.AddOrReplacePublishers("NServiceBus.Router", settings.PublisherTable.Select(kvp => new PublisherTableEntry(kvp.Key, publisherAddress)).ToList());
-
         context.Pipeline.Register(new ForwardSiteMessagesToRouterBehavior(settings.RouterAddress), "Routes messages sent to sites to the bridge.");
         context.Pipeline.Register(new RoutingHeadersBehavior(settings.SendRouteTable), "Sets the ultimate destination endpoint on the outgoing messages.");
-        context.Pipeline.Register(b => new RouterSubscribeBehavior(subscriberAddress, context.Settings.EndpointName(), settings.RouterAddress, b.Build<IDispatchMessages>(), settings.PublisherTable, nativePubSub), 
-            "Dispatches the subscribe request via a router.");
-        context.Pipeline.Register(b => new RouterUnsubscribeBehavior(subscriberAddress, context.Settings.EndpointName(), settings.RouterAddress, b.Build<IDispatchMessages>(), settings.PublisherTable, nativePubSub),
-            "Dispatches the unsubscribe request via a router.");
+
+        var isSendOnlyEndpoint = context.Settings.GetOrDefault<bool>("Endpoint.SendOnly");
+        if (!isSendOnlyEndpoint)
+        {
+            var distributorAddress = context.Settings.GetOrDefault<string>("LegacyDistributor.Address");
+            var subscriberAddress = distributorAddress ?? context.Settings.LocalAddress();
+
+            var publisherAddress = PublisherAddress.CreateFromPhysicalAddresses(settings.RouterAddress);
+            publishers.AddOrReplacePublishers("NServiceBus.Router", settings.PublisherTable.Select(kvp => new PublisherTableEntry(kvp.Key, publisherAddress)).ToList());
+
+            context.Pipeline.Register(b => new RouterSubscribeBehavior(subscriberAddress, context.Settings.EndpointName(), settings.RouterAddress, b.Build<IDispatchMessages>(), settings.PublisherTable, nativePubSub),
+                "Dispatches the subscribe request via a router.");
+            context.Pipeline.Register(b => new RouterUnsubscribeBehavior(subscriberAddress, context.Settings.EndpointName(), settings.RouterAddress, b.Build<IDispatchMessages>(), settings.PublisherTable, nativePubSub),
+                "Dispatches the unsubscribe request via a router.");
+        }
+
     }
 }
