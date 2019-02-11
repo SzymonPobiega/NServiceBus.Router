@@ -13,7 +13,7 @@ class SubscribePreroutingTerminator : ChainTerminator<SubscribePreroutingContext
     {
         if (!context.Destinations.Any())
         {
-            throw new UnforwardableMessageException("No destinations could be found for message.");
+            return false;
         }
 
         var outgoingInterfaces = routingProtocol.RouteTable.GetOutgoingInterfaces(context.IncomingInterface, context.Destinations);
