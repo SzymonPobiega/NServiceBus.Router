@@ -72,7 +72,7 @@
 
             if (invoked.Count < 1)
             {
-                log.Warn("No terminator handled the message. This might indicate a configuration problem.");
+                throw new UnforwardableMessageException($"No terminator handled the message in the {typeof(T).Name} chain. This might indicate a configuration problem. If the message should be dropped, register a chain terminator that explicitly marks that type of messages as handled.");
             }
             if (invoked.Count > 1)
             {
