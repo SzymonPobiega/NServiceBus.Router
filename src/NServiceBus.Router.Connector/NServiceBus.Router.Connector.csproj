@@ -7,7 +7,7 @@
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="GitVersionTask" Version="4.0.0-*" PrivateAssets="All" />
+    <PackageReference Include="MinVer" Version="1.0.0-*" PrivateAssets="All" />
     <PackageReference Include="NServiceBus" Version="[7.0.0, 8.0.0)" />
   </ItemGroup>
 
