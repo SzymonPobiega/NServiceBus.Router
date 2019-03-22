@@ -20,7 +20,9 @@ class ReplyPreroutingTerminator : ChainTerminator<ReplyPreroutingContext>
     static string InterfaceForReply(ReplyPreroutingContext context)
     {
         string destinationIface = null;
-        if (!context.Headers.TryGetValue(Headers.CorrelationId, out var correlationId))
+
+        if (!context.Headers.TryGetValue(RouterHeaders.PreviousCorrelationId, out var correlationId)
+         && !context.Headers.TryGetValue(Headers.CorrelationId, out correlationId))
         {
             throw new UnforwardableMessageException($"The reply has to contain a '{Headers.CorrelationId}' header set by the sending endpoint when sending out the initial message.");
         }

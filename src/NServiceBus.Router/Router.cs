@@ -71,6 +71,7 @@ namespace NServiceBus.Router
             chains.AddRule(_ => new ForwardReplyRule());
             chains.AddRule(c => new SendReplyTraceRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName));
             chains.AddRule(c => new PublishReplyTraceRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName));
+            chains.AddRule(c => new ReplyReplyTraceRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName));
             chains.AddRule(c => new ForwardSubscribeGatewayRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName));
             chains.AddRule(c => new ForwardUnsubscribeGatewayRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName));
 

@@ -31,6 +31,20 @@ class PublishReplyTraceRule : ReplyTraceRule, IRule<ForwardPublishContext, Forwa
     }
 }
 
+class ReplyReplyTraceRule : ReplyTraceRule, IRule<ForwardReplyContext, ForwardReplyContext>
+{
+    public ReplyReplyTraceRule(string localAddress, string endpointName)
+        : base(localAddress, endpointName)
+    {
+    }
+
+    public Task Invoke(ForwardReplyContext context, Func<ForwardReplyContext, Task> next)
+    {
+        AddTraceHeadersForRoutingBackReply(context);
+        return next(context);
+    }
+}
+
 abstract class ReplyTraceRule
 {
     string localAddress;
@@ -89,6 +103,7 @@ abstract class ReplyTraceRule
                     break;
                 }
 
+                context.ForwardedHeaders[RouterHeaders.PreviousCorrelationId] = context.ForwardedHeaders[Headers.CorrelationId];
                 correlationId = temp;
             }
 
