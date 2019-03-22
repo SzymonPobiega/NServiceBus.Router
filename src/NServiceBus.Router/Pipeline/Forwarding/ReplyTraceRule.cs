@@ -60,7 +60,7 @@ abstract class ReplyTraceRule
     {
         if (!context.ForwardedHeaders.ContainsKey(RouterHeaders.ReplyToRouter))
         {
-            UnwrapExistingCorrelationId(context);
+            UnwrapCorrelationIdAndSetTraceHeader(context);
         }
 
         var newCorrelationId = TLV
@@ -85,7 +85,12 @@ abstract class ReplyTraceRule
         context.ForwardedHeaders[RouterHeaders.ReplyToRouter] = endpointName;
     }
 
-    static void UnwrapExistingCorrelationId(BaseForwardRuleContext context)
+    /// <summary>
+    /// Invoked when forwarding a message that was sent in context of a message forwarded previously by the Router. Such
+    /// message contains the TLV-type correlation ID that contains the path of the message. The CorrelationID header
+    /// need to be re-set and the path is copied to the trace header in order to allow the reply to a reply to be routed.
+    /// </summary>
+    static void UnwrapCorrelationIdAndSetTraceHeader(BaseForwardRuleContext context)
     {
         if (context.ForwardedHeaders.TryGetValue(Headers.CorrelationId, out var correlationId))
         {
@@ -103,7 +108,7 @@ abstract class ReplyTraceRule
                     break;
                 }
 
-                context.ForwardedHeaders[RouterHeaders.PreviousCorrelationId] = context.ForwardedHeaders[Headers.CorrelationId];
+                context.ForwardedHeaders[RouterHeaders.ReplyToTrace] = context.ForwardedHeaders[Headers.CorrelationId];
                 correlationId = temp;
             }
 

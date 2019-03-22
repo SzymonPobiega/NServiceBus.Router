@@ -12,7 +12,7 @@ class ForwardReplyRule : ChainTerminator<ForwardReplyContext>
         string replyTo = null;
         string replyToRouter = null;
         string unwrappedCorrelationId = null;
-        if (!context.ForwardedHeaders.TryGetValue(RouterHeaders.PreviousCorrelationId, out var correlationId))
+        if (!context.ForwardedHeaders.TryGetValue(RouterHeaders.ReplyToTrace, out var correlationId))
         {
             throw new UnforwardableMessageException($"The reply has to contain a '{Headers.CorrelationId}' header set by the router connector when sending out the initial message.");
         }
@@ -44,7 +44,7 @@ class ForwardReplyRule : ChainTerminator<ForwardReplyContext>
         if (replyTo != null)
         {
             //Copy the correlation ID header which contains the route the reply underwent to previous header to preserve it
-            context.ForwardedHeaders[RouterHeaders.PreviousCorrelationId] = context.ForwardedHeaders[Headers.CorrelationId];
+            context.ForwardedHeaders[RouterHeaders.ReplyToTrace] = context.ForwardedHeaders[Headers.CorrelationId];
 
             //Update the correlation ID 
             context.ForwardedHeaders[Headers.CorrelationId] = unwrappedCorrelationId ?? correlationId;
@@ -59,7 +59,7 @@ class ForwardReplyRule : ChainTerminator<ForwardReplyContext>
         }
         if (replyToRouter != null)
         {
-            context.ForwardedHeaders[RouterHeaders.PreviousCorrelationId] = unwrappedCorrelationId ?? correlationId;
+            context.ForwardedHeaders[RouterHeaders.ReplyToTrace] = unwrappedCorrelationId ?? correlationId;
             var chain = context.Chains.Get<AnycastContext>();
             var forkContext = new AnycastContext(replyToRouter, outgoingMessage, DistributionStrategyScope.Send, context);
 
