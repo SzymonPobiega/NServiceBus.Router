@@ -26,6 +26,7 @@ class RouterConnectionFeature : Feature
 
         context.Pipeline.Register(new ForwardSiteMessagesToRouterBehavior(settings.RouterAddress), "Routes messages sent to sites to the bridge.");
         context.Pipeline.Register(new RoutingHeadersBehavior(settings.SendRouteTable), "Sets the ultimate destination endpoint on the outgoing messages.");
+        context.Pipeline.Register(new CorrelationIdForReplyBehavior(), "Copy previous correlation ID for reply");
 
         var isSendOnlyEndpoint = context.Settings.GetOrDefault<bool>("Endpoint.SendOnly");
         if (!isSendOnlyEndpoint)

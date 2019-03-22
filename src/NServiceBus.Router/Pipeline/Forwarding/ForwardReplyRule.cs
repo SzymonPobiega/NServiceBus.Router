@@ -11,7 +11,8 @@ class ForwardReplyRule : ChainTerminator<ForwardReplyContext>
     {
         string replyTo = null;
         string replyToRouter = null;
-        if (!context.ReceivedHeaders.TryGetValue(Headers.CorrelationId, out var correlationId))
+        string unwrappedCorrelationId = null;
+        if (!context.ForwardedHeaders.TryGetValue(RouterHeaders.PreviousCorrelationId, out var correlationId))
         {
             throw new UnforwardableMessageException($"The reply has to contain a '{Headers.CorrelationId}' header set by the router connector when sending out the initial message.");
         }
@@ -26,7 +27,7 @@ class ForwardReplyRule : ChainTerminator<ForwardReplyContext>
                 }
                 if (t == "id")
                 {
-                    context.ForwardedHeaders[Headers.CorrelationId] = v;
+                    unwrappedCorrelationId = v;
                 }
                 if (t == "reply-to-router")
                 {
@@ -42,8 +43,14 @@ class ForwardReplyRule : ChainTerminator<ForwardReplyContext>
         var outgoingMessage = new OutgoingMessage(context.MessageId, context.ForwardedHeaders, context.ReceivedBody);
         if (replyTo != null)
         {
-            var operation = new TransportOperation(outgoingMessage, new UnicastAddressTag(replyTo));
+            //Copy the correlation ID header which contains the route the reply underwent to previous header to preserve it
+            context.ForwardedHeaders[RouterHeaders.PreviousCorrelationId] = context.ForwardedHeaders[Headers.CorrelationId];
 
+            //Update the correlation ID 
+            context.ForwardedHeaders[Headers.CorrelationId] = unwrappedCorrelationId ?? correlationId;
+            context.ForwardedHeaders.Remove(RouterHeaders.ReplyToRouter);
+
+            var operation = new TransportOperation(outgoingMessage, new UnicastAddressTag(replyTo));
             var chain = context.Chains.Get<PostroutingContext>();
             var forkContext = new PostroutingContext(null, operation, context);
             await chain.Invoke(forkContext).ConfigureAwait(false);
@@ -52,6 +59,7 @@ class ForwardReplyRule : ChainTerminator<ForwardReplyContext>
         }
         if (replyToRouter != null)
         {
+            context.ForwardedHeaders[RouterHeaders.PreviousCorrelationId] = unwrappedCorrelationId ?? correlationId;
             var chain = context.Chains.Get<AnycastContext>();
             var forkContext = new AnycastContext(replyToRouter, outgoingMessage, DistributionStrategyScope.Send, context);
 

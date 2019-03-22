@@ -9,10 +9,10 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
     using AcceptanceTesting.Customization;
 
     [TestFixture]
-    public class When_replying_to_a_message : NServiceBusAcceptanceTest
+    public class When_replying_to_a_reply : NServiceBusAcceptanceTest
     {
         [Test]
-        public async Task Should_deliver_the_reply_without_the_need_to_configure_the_bridge()
+        public async Task Should_deliver_the_final_reply()
         {
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
@@ -24,19 +24,19 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 })
                 .WithEndpoint<Sender>(c => c.When(s => s.Send(new MyRequest())))
                 .WithEndpoint<Receiver>()
-                .Done(c => c.RequestReceived && c.ResponseReceived)
+                .Done(c => c.RequestReceived && c.ResponseReceived && c.FinalResponseReceived)
                 .Run();
 
             Assert.IsTrue(result.RequestReceived);
             Assert.IsTrue(result.ResponseReceived);
-            Assert.AreEqual("Router", result.ReplyToInTheResponse);
+            Assert.IsTrue(result.FinalResponseReceived);
         }
 
         class Context : ScenarioContext
         {
             public bool RequestReceived { get; set; }
             public bool ResponseReceived { get; set; }
-            public string ReplyToInTheResponse { get; set; }
+            public bool FinalResponseReceived { get; set; }
         }
 
         class Sender : EndpointConfigurationBuilder
@@ -63,9 +63,8 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 public Task Handle(MyResponse response, IMessageHandlerContext context)
                 {
                     scenarioContext.ResponseReceived = true;
-                    scenarioContext.ReplyToInTheResponse = context.MessageHeaders[Headers.ReplyToAddress];
-                    
-                    return Task.CompletedTask;
+
+                    return context.Reply(new MyFinalResponse());
                 }
             }
         }
@@ -96,6 +95,22 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                     return context.Reply(new MyResponse());
                 }
             }
+
+            class MyFinalResponseHandler : IHandleMessages<MyFinalResponse>
+            {
+                Context scenarioContext;
+
+                public MyFinalResponseHandler(Context scenarioContext)
+                {
+                    this.scenarioContext = scenarioContext;
+                }
+
+                public Task Handle(MyFinalResponse request, IMessageHandlerContext context)
+                {
+                    scenarioContext.FinalResponseReceived = true;
+                    return Task.CompletedTask;
+                }
+            }
         }
 
         class MyRequest : IMessage
@@ -103,6 +118,10 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
         }
 
         class MyResponse : IMessage
+        {
+        }
+
+        class MyFinalResponse : IMessage
         {
         }
     }

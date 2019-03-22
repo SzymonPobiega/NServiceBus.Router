@@ -9,10 +9,10 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
     using AcceptanceTesting.Customization;
 
     [TestFixture]
-    public class When_replying_to_a_message : NServiceBusAcceptanceTest
+    public class When_sending_a_message_based_on_other_message : NServiceBusAcceptanceTest
     {
         [Test]
-        public async Task Should_deliver_the_reply_without_the_need_to_configure_the_bridge()
+        public async Task Should_unwrap_correlation_id_when_sending_the_second_message()
         {
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
@@ -21,6 +21,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                     cfg.AddInterface<TestTransport>("Right", t => t.BrokerBravo()).InMemorySubscriptions();
 
                     cfg.UseStaticRoutingProtocol().AddForwardRoute("Left", "Right");
+                    cfg.UseStaticRoutingProtocol().AddForwardRoute("Right", "Left");
                 })
                 .WithEndpoint<Sender>(c => c.When(s => s.Send(new MyRequest())))
                 .WithEndpoint<Receiver>()
@@ -29,14 +30,16 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
 
             Assert.IsTrue(result.RequestReceived);
             Assert.IsTrue(result.ResponseReceived);
-            Assert.AreEqual("Router", result.ReplyToInTheResponse);
+
+            //Ensure the correlation ID header to not grow forever
+            Assert.AreEqual(112, result.ReceivedCorrelationId.Length);
         }
 
         class Context : ScenarioContext
         {
             public bool RequestReceived { get; set; }
             public bool ResponseReceived { get; set; }
-            public string ReplyToInTheResponse { get; set; }
+            public string ReceivedCorrelationId { get; set; }
         }
 
         class Sender : EndpointConfigurationBuilder
@@ -63,8 +66,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 public Task Handle(MyResponse response, IMessageHandlerContext context)
                 {
                     scenarioContext.ResponseReceived = true;
-                    scenarioContext.ReplyToInTheResponse = context.MessageHeaders[Headers.ReplyToAddress];
-                    
+                    scenarioContext.ReceivedCorrelationId = context.MessageHeaders[Headers.CorrelationId];
                     return Task.CompletedTask;
                 }
             }
@@ -76,8 +78,9 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    //No bridge configuration needed for reply
-                    c.UseTransport<TestTransport>().BrokerBravo();
+                    var routing = c.UseTransport<TestTransport>().BrokerBravo().Routing();
+                    var bridge = routing.ConnectToRouter("Router");
+                    bridge.RouteToEndpoint(typeof(MyResponse), Conventions.EndpointNamingConvention(typeof(Sender)));
                 });
             }
 
@@ -93,7 +96,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 public Task Handle(MyRequest request, IMessageHandlerContext context)
                 {
                     scenarioContext.RequestReceived = true;
-                    return context.Reply(new MyResponse());
+                    return context.Send(new MyResponse());
                 }
             }
         }
