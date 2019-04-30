@@ -1,6 +1,6 @@
 namespace NServiceBus.Router
 {
-    
+
     using System;
     using System.Collections.Generic;
     using Transport;
@@ -35,7 +35,7 @@ namespace NServiceBus.Router
         /// <typeparam name="T">Transport to use for this interface.</typeparam>
         /// <param name="name">Name of the interface.</param>
         /// <param name="customization">A callback for customizing the transport settings.</param>
-        public InterfaceConfiguration<T> AddInterface<T>(string name, Action<TransportExtensions<T>> customization) 
+        public InterfaceConfiguration<T> AddInterface<T>(string name, Action<TransportExtensions<T>> customization)
             where T : TransportDefinition, new()
         {
             var ifaceConfig = new InterfaceConfiguration<T>(name, customization, this);
@@ -45,7 +45,7 @@ namespace NServiceBus.Router
 
         Interface CreateInterface<T>(InterfaceConfiguration<T> ifaceConfig) where T : TransportDefinition, new()
         {
-            return ifaceConfig.Create(Name, "poison", autoCreateQueues, autoCreateQueuesIdentity, ImmediateRetries, DelayedRetries, CircuitBreakerThreshold, typeGenerator, Settings);
+            return ifaceConfig.Create(Name, PoisonQueueName, autoCreateQueues, autoCreateQueuesIdentity, ImmediateRetries, DelayedRetries, CircuitBreakerThreshold, typeGenerator, Settings);
         }
 
         /// <summary>
@@ -72,6 +72,11 @@ namespace NServiceBus.Router
         /// Gets or sets the number of consecutive failures required to trigger the throttled mode.
         /// </summary>
         public int CircuitBreakerThreshold { get; set; } = 5;
+
+        /// <summary>
+        /// Gets or sets the name of the poison queue.
+        /// </summary>
+        public string PoisonQueueName { get; set; } = "poison";
 
         /// <summary>
         /// Configures the routing protocol.
@@ -114,7 +119,7 @@ namespace NServiceBus.Router
         /// </summary>
         /// <typeparam name="TInput">Input type of the chain.</typeparam>
         /// <param name="chainDefinition">Chain definition</param>
-        public void DefineChain<TInput>(Func<ChainBuilder, IChain<TInput>> chainDefinition) 
+        public void DefineChain<TInput>(Func<ChainBuilder, IChain<TInput>> chainDefinition)
             where TInput : IRuleContext
         {
             Chains.AddChain(chainDefinition);
