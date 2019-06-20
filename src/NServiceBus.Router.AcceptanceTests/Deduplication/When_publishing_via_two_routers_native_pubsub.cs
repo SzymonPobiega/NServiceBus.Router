@@ -28,7 +28,7 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
 #pragma warning restore 618
                     var linkInterface = cfg.AddInterface<TestTransport>("Blue", t => t.BrokerYankee());
                     //linkInterface.DisableNativePubSub();
-                    linkInterface.EnableMessageDrivenPublishSubscribe(new InMemorySubscriptionStorage());
+                    linkInterface.InMemorySubscriptions();
 
                     var sqlInterface = cfg.AddInterface<SqlServerTransport>("Green", t =>
                     {
@@ -51,7 +51,7 @@ namespace NServiceBus.Router.AcceptanceTests.Deduplication
 
                     var linkInterface = cfg.AddInterface<TestTransport>("Blue", t => t.BrokerYankee());
                     //linkInterface.DisableNativePubSub();
-                    linkInterface.EnableMessageDrivenPublishSubscribe(new InMemorySubscriptionStorage());
+                    linkInterface.InMemorySubscriptions();
 
                     var sqlInterface = cfg.AddInterface<SqlServerTransport>("Red", t =>
                     {

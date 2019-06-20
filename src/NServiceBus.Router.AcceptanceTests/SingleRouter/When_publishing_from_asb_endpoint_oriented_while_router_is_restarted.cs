@@ -60,7 +60,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
 
                 var builder = new ConventionsBuilder(settings);
                 builder.DefiningEventsAs(EventConvention);
-                settings.Set<NServiceBus.Conventions>(builder.Conventions);
+                settings.Set(builder.Conventions);
 
                 var topology = t.UseEndpointOrientedTopology();
                 topology.EnableMigrationToForwardingTopology();

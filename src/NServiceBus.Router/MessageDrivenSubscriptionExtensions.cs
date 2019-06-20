@@ -16,10 +16,19 @@ namespace NServiceBus.Router
         public static void EnableMessageDrivenPublishSubscribe<T>(this InterfaceConfiguration<T> interfaceConfig, ISubscriptionStorage subscriptionStorage)
             where T : TransportDefinition, new()
         {
-            interfaceConfig.AddRule(c => new ForwardPublishStorageDrivenRule(subscriptionStorage, c.DistributionPolicy));
-            interfaceConfig.AddRule(c => new ForwardSubscribeMessageDrivenRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName));
-            interfaceConfig.AddRule(c => new ForwardUnsubscribeMessageDrivenRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName));
-            interfaceConfig.AddRule(c => new StorageDrivenSubscriptionRule(subscriptionStorage));
+            interfaceConfig.Settings.Set("EnableMessageDrivenPubSub", true);
+            interfaceConfig.Settings.Set<ISubscriptionStorage>(subscriptionStorage);
+        }
+
+        /// <summary>
+        /// Disables message-driven storage-based publish/subscribe for a given interface. 
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="interfaceConfig"></param>
+        public static void DisableMessageDrivenPublishSubscribe<T>(this InterfaceConfiguration<T> interfaceConfig)
+            where T : TransportDefinition, new()
+        {
+            interfaceConfig.Settings.Set("EnableMessageDrivenPubSub", false);
         }
     }
 }

@@ -33,7 +33,7 @@ namespace NServiceBus.Router.AcceptanceTests.Poison
 
             Assert.IsFalse(result.ResponseReceived);
             Assert.IsTrue(result.PoisonMessageDetected);
-            StringAssert.StartsWith("The reply has to contain a \'NServiceBus.CorrelationId\' header", result.ExceptionMessage);
+            StringAssert.StartsWith("The reply has to contain either 'NServiceBus.CorrelationId' header", result.ExceptionMessage);
             Assert.IsTrue(result.Logs.Any(l => l.Message.Contains(result.ExceptionMessage)));
         }
 

@@ -18,3 +18,4 @@ class ForwardPublishNativeRule : ChainTerminator<ForwardPublishContext>
         return true;
     }
 }
+
