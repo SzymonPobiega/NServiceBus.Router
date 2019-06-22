@@ -21,13 +21,33 @@
         /// <summary>
         /// Creates new instance of SQL-based subscription persistence.
         /// </summary>
-        /// <param name="connectionBuilder"></param>
+        /// <param name="connectionBuilder">A func that returns a not-yet-opened connection to the database.</param>
         /// <param name="tablePrefix"></param>
         /// <param name="sqlDialect"></param>
         /// <param name="cacheFor"></param>
         public SqlSubscriptionStorage(Func<DbConnection> connectionBuilder, string tablePrefix, SqlDialect sqlDialect, TimeSpan? cacheFor)
         {
-            this.connectionBuilder = connectionBuilder;
+            this.connectionOpener = () => connectionBuilder.OpenConnection();
+            this.tablePrefix = tablePrefix;
+            this.sqlDialect = sqlDialect;
+            this.cacheFor = cacheFor;
+            subscriptionCommands = SubscriptionCommandBuilder.Build(sqlDialect, tablePrefix);
+            if (cacheFor != null)
+            {
+                cache = new ConcurrentDictionary<string, CacheItem>();
+            }
+        }
+
+        /// <summary>
+        /// Creates new instance of SQL-based subscription persistence.
+        /// </summary>
+        /// <param name="asyncConnectionBuilder">A func that returns an already open connection to the database.</param>
+        /// <param name="tablePrefix"></param>
+        /// <param name="sqlDialect"></param>
+        /// <param name="cacheFor"></param>
+        public SqlSubscriptionStorage(Func<Task<DbConnection>> asyncConnectionBuilder, string tablePrefix, SqlDialect sqlDialect, TimeSpan? cacheFor)
+        {
+            this.connectionOpener = asyncConnectionBuilder;
             this.tablePrefix = tablePrefix;
             this.sqlDialect = sqlDialect;
             this.cacheFor = cacheFor;
@@ -43,7 +63,7 @@
         /// </summary>
         public async Task Install()
         {
-            using (var connection = await connectionBuilder.OpenConnection().ConfigureAwait(false))
+            using (var connection = await connectionOpener().ConfigureAwait(false))
             using (var transaction = connection.BeginTransaction())
             {
                 await sqlDialect.ExecuteTableCommand(connection, transaction, SubscriptionScriptBuilder.BuildCreateScript(sqlDialect), tablePrefix);
@@ -56,7 +76,7 @@
         /// </summary>
         public async Task Uninstall()
         {
-            using (var connection = await connectionBuilder.OpenConnection().ConfigureAwait(false))
+            using (var connection = await connectionOpener().ConfigureAwait(false))
             using (var transaction = connection.BeginTransaction())
             {
                 await sqlDialect.ExecuteTableCommand(connection, transaction, SubscriptionScriptBuilder.BuildDropScript(sqlDialect), tablePrefix);
@@ -71,7 +91,7 @@
         {
             await Retry(async () =>
             {
-                using (var connection = await connectionBuilder.OpenConnection().ConfigureAwait(false))
+                using (var connection = await connectionOpener().ConfigureAwait(false))
                 using (var command = sqlDialect.CreateCommand(connection))
                 {
                     command.CommandText = subscriptionCommands.Subscribe;
@@ -92,7 +112,7 @@
         {
             await Retry(async () =>
             {
-                using (var connection = await connectionBuilder.OpenConnection().ConfigureAwait(false))
+                using (var connection = await connectionOpener().ConfigureAwait(false))
                 using (var command = sqlDialect.CreateCommand(connection))
                 {
                     command.CommandText = subscriptionCommands.Unsubscribe;
@@ -193,7 +213,7 @@
         async Task<IEnumerable<Subscriber>> GetSubscriptions(List<MessageType> messageHierarchy)
         {
             var getSubscribersCommand = subscriptionCommands.GetSubscribers(messageHierarchy);
-            using (var connection = await connectionBuilder.OpenConnection().ConfigureAwait(false))
+            using (var connection = await connectionOpener().ConfigureAwait(false))
             using (var command = sqlDialect.CreateCommand(connection))
             {
                 for (var i = 0; i < messageHierarchy.Count; i++)
@@ -226,7 +246,7 @@
         }
 
         ConcurrentDictionary<string, CacheItem> cache;
-        Func<DbConnection> connectionBuilder;
+        Func<Task<DbConnection>> connectionOpener;
         string tablePrefix;
         SqlDialect sqlDialect;
         TimeSpan? cacheFor;
