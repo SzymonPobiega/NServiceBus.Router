@@ -30,7 +30,7 @@ namespace NServiceBus.Router.AcceptanceTests.Poison
 
             Assert.IsFalse(result.RequestReceived);
             Assert.IsTrue(result.PoisonMessageDetected);
-            StringAssert.StartsWith("No terminator handled the message in the SendPreroutingContext", result.ExceptionMessage);
+            StringAssert.StartsWith("No destination found for message", result.ExceptionMessage);
             Assert.IsTrue(result.Logs.Any(l => l.Message.Contains(result.ExceptionMessage)));
         }
 

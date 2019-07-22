@@ -47,8 +47,6 @@
     class TerminatorInvocationRule<T> : IRule<T, ChainTerminator<T>.ITerminatingContext>, IChainTerminator
         where T : IRuleContext
     {
-        static ILog log = LogManager.GetLogger<T>();
-
         Dictionary<string, IRule<T, ChainTerminator<T>.ITerminatingContext>> terminators;
 
         public TerminatorInvocationRule(List<IRule<T, ChainTerminator<T>.ITerminatingContext>> terminators)
@@ -69,16 +67,6 @@
                 }).ConfigureAwait(false);
 
             }
-
-            if (invoked.Count < 1)
-            {
-                throw new UnforwardableMessageException($"No terminator handled the message in the {typeof(T).Name} chain. This might indicate a configuration problem. If the message should be dropped, register a chain terminator that explicitly marks that type of messages as handled.");
-            }
-            if (invoked.Count > 1)
-            {
-                log.Warn($"Multiple terminators ({string.Join(",", invoked)}) handled the message. This might indicate a configuration problem.");
-            }
-
         }
     }
 }

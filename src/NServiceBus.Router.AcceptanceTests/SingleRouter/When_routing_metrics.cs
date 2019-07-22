@@ -18,11 +18,11 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
                 {
-                    cfg.AddInterface<TestTransport>("MSMQ", t => t.BrokerAlpha()).DisableMessageDrivenPublishSubscribe();
+                    cfg.AddInterface<TestTransport>("MSMQ", t => t.Transactions(TransportTransactionMode.ReceiveOnly).BrokerAlpha()).DisableMessageDrivenPublishSubscribe();
                     cfg.AddInterface<TestTransport>("SQL", t => t.BrokerBravo()).DisableMessageDrivenPublishSubscribe();
                     cfg.UseStaticRoutingProtocol();
 
-                    cfg.Chains.AddRule(c => new MetricsPreroutingTerminator("SQL", "Metrics"));
+                    cfg.AddRule(c => new MetricsPreroutingTerminator("SQL", "Metrics"));
                 })
                 .WithSpyComponent("Metrics", t => t.BrokerBravo(), (scenarioContext, messageContext, _) =>
                 {
@@ -55,8 +55,8 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
 
             protected override async Task<bool> Terminate(PreroutingContext context)
             {
-                if (context.Headers.TryGetValue(Headers.EnclosedMessageTypes, out var messageTypes)
-                    && messageTypes == "NServiceBus.Metrics.EndpointMetadataReport")
+                if (context.Headers.ContainsKey("NServiceBus.Metric.Type") || 
+                    context.Headers.TryGetValue(Headers.EnclosedMessageTypes, out var messageTypes) && messageTypes == "NServiceBus.Metrics.EndpointMetadataReport")
                 {
                     var interfaces = context.Extensions.Get<IInterfaceChains>();
                     await interfaces.GetChainsFor(metricsInterface).Get<AnycastContext>()

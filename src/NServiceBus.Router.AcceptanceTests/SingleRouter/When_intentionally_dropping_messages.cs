@@ -30,7 +30,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             Assert.IsTrue(result.Dropped);
         }
 
-        class CustomDestinationRule : ChainTerminator<SendPreroutingContext>
+        class CustomDestinationRule : IRule<SendPreroutingContext, SendPreroutingContext>
         {
             Context scenarioContext;
 
@@ -39,10 +39,16 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 this.scenarioContext = scenarioContext;
             }
 
-            protected override Task<bool> Terminate(SendPreroutingContext context)
+            public Task Invoke(SendPreroutingContext context, Func<SendPreroutingContext, Task> next)
             {
-                scenarioContext.Dropped = true;
-                return Task.FromResult(true);
+                if (context.Headers.TryGetValue(Headers.EnclosedMessageTypes, out var types) 
+                    && types.Contains("MyRequest"))
+                {
+                    scenarioContext.Dropped = true;
+                    return Task.CompletedTask;
+                }
+
+                return next(context);
             }
         }
 

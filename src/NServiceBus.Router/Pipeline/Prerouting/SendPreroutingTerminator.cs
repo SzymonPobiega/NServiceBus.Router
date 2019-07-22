@@ -12,7 +12,7 @@ class SendPreroutingTerminator : ChainTerminator<SendPreroutingContext>
     {
         if (!context.Destinations.Any())
         {
-            return false;
+            throw new UnforwardableMessageException($"No destination found for message {context.MessageId}. This might indicate a configuration problem.");
         }
 
         var outgoingInterfaces = routingProtocol.RouteTable.GetOutgoingInterfaces(context.IncomingInterface, context.Destinations)
@@ -25,7 +25,8 @@ class SendPreroutingTerminator : ChainTerminator<SendPreroutingContext>
             {
                 var chains = interfaces.GetChainsFor(iface);
                 var chain = chains.Get<ForwardSendContext>();
-                return chain.Invoke(new ForwardSendContext(iface, routes.ToArray(), context));
+                var forwardSendContext = new ForwardSendContext(iface, routes.ToArray(), context);
+                return chain.Invoke(forwardSendContext);
             });
 
         await Task.WhenAll(forkTasks).ConfigureAwait(false);
