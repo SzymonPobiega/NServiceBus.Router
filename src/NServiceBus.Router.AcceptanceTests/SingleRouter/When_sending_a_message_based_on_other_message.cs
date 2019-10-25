@@ -32,7 +32,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             Assert.IsTrue(result.ResponseReceived);
 
             //Ensure the correlation ID header to not grow forever
-            Assert.AreEqual(112, result.ReceivedCorrelationId.Length);
+            Assert.AreEqual(118, result.ReceivedCorrelationId.Length);
         }
 
         class Context : ScenarioContext

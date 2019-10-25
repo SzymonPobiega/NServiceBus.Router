@@ -15,12 +15,7 @@
 
             var types = assemblies.Assemblies
                 //exclude all test types by default
-                .Where(a =>
-                {
-                    var references = a.GetReferencedAssemblies();
-
-                    return references.All(an => an.Name != "nunit.framework");
-                })
+                .Where(a => !a.GetName().Name.EndsWith("AcceptanceTests"))
                 .SelectMany(a => a.GetTypes());
 
             types = types.Union(GetNestedTypeRecursive(endpointConfiguration.BuilderType.DeclaringType, endpointConfiguration.BuilderType));

@@ -64,5 +64,6 @@ public static class ConfigureEndpointTestTransport
         var storageDir = Path.Combine(tempDir, testRunId, brokerId);
 
         transportConfig.StorageDirectory(storageDir);
+        transportConfig.BrokerName(brokerId);
     }
 }

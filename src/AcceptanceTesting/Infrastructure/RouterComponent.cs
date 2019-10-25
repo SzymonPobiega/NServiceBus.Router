@@ -18,7 +18,7 @@ class RouterComponent : IComponentBehavior
     public Task<ComponentRunner> CreateRunner(RunDescriptor run)
     {
         var config = configCallback(run.ScenarioContext);
-
+        config.Settings.Set<ScenarioContext>(run.ScenarioContext);
         config.AutoCreateQueues();
         var newFactories = new List<Func<Interface>>();
 

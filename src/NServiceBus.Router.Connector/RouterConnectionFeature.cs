@@ -34,8 +34,8 @@ class RouterConnectionFeature : Feature
             var distributorAddress = context.Settings.GetOrDefault<string>("LegacyDistributor.Address");
             var subscriberAddress = distributorAddress ?? context.Settings.LocalAddress();
 
-            var publisherAddress = PublisherAddress.CreateFromPhysicalAddresses(settings.RouterAddress);
-            publishers.AddOrReplacePublishers("NServiceBus.Router", settings.PublisherTable.Select(kvp => new PublisherTableEntry(kvp.Key, publisherAddress)).ToList());
+            //var publisherAddress = PublisherAddress.CreateFromPhysicalAddresses(settings.RouterAddress);
+            //publishers.AddOrReplacePublishers("NServiceBus.Router", settings.PublisherTable.Select(kvp => new PublisherTableEntry(kvp.Key, publisherAddress)).ToList());
 
             context.Pipeline.Register(b => new RouterSubscribeBehavior(subscriberAddress, context.Settings.EndpointName(), settings.RouterAddress, b.Build<IDispatchMessages>(), settings.PublisherTable, nativePubSub),
                 "Dispatches the subscribe request via a router.");

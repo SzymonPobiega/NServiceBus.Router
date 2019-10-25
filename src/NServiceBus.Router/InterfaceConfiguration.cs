@@ -17,6 +17,7 @@
         bool? autoCreateQueues;
         string autoCreateQueuesIdentity;
         int? maximumConcurrency;
+        string overriddenEndpointName;
 
         /// <summary>
         /// Interface's extensibility settings.
@@ -79,6 +80,15 @@
         }
 
         /// <summary>
+        /// Overrides the interface endpoint name.
+        /// </summary>
+        /// <param name="interfaceEndpointName">Endpoint name to use for this interface instead of Router's name</param>
+        public void OverrideEndpointName(string interfaceEndpointName)
+        {
+            overriddenEndpointName = interfaceEndpointName;
+        }
+
+        /// <summary>
         /// Limits the processing concurrency of the port to a given value.
         /// </summary>
         /// <param name="maximumConcurrency">Maximum level of concurrency for the port's transport.</param>
@@ -105,7 +115,7 @@
                 return new RuleCreationContext(Name, EndpointInstances, DistributionPolicy, e, typeGenerator, Settings);
             }
 
-            return new Interface<T>(endpointName, Name, customization, ContextFactory, poisonQueue, maximumConcurrency, autoCreateQueues ?? routerAutoCreateQueues ?? false, autoCreateQueuesIdentity ?? routerAutoCreateQueuesIdentity, immediateRetries, delayedRetries, circuitBreakerThreshold);
+            return new Interface<T>(overriddenEndpointName ?? endpointName, Name, customization, ContextFactory, poisonQueue, maximumConcurrency, autoCreateQueues ?? routerAutoCreateQueues ?? false, autoCreateQueuesIdentity ?? routerAutoCreateQueuesIdentity, immediateRetries, delayedRetries, circuitBreakerThreshold);
         }
     }
 }

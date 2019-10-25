@@ -13,13 +13,22 @@
         /// <summary>
         /// Creates new instance.
         /// </summary>
-        public ForwardPublishContext(string outgoingInterface, Type rootType, PublishPreroutingContext parentContext)
+        public ForwardPublishContext(string outgoingInterface, Type rootType, Action acknowledgeMessageDrop, PublishPreroutingContext parentContext)
             : base(outgoingInterface, parentContext)
         {
+            this.acknowledgeMessageDrop = acknowledgeMessageDrop;
             ReceivedHeaders = parentContext.Headers;
             ReceivedBody = parentContext.Body;
             Types = parentContext.Types;
             RootEventType = rootType;
+        }
+
+        /// <summary>
+        /// Marks this message as OK to be dropped if no chain terminator forwards it.
+        /// </summary>
+        public void DoNotRequireThisMessageToBeForwarded()
+        {
+            acknowledgeMessageDrop();
         }
 
         /// <summary>

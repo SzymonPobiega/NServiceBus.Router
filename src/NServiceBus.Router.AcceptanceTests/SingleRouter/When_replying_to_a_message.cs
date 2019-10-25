@@ -29,7 +29,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
 
             Assert.IsTrue(result.RequestReceived);
             Assert.IsTrue(result.ResponseReceived);
-            Assert.AreEqual("Router", result.ReplyToInTheResponse);
+            Assert.AreEqual("Router@Alpha", result.ReplyToInTheResponse);
         }
 
         class Context : ScenarioContext

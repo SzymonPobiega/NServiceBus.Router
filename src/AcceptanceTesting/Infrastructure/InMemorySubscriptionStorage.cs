@@ -2,9 +2,46 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using NServiceBus;
+using NServiceBus.Configuration.AdvancedExtensibility;
 using NServiceBus.Extensibility;
+using NServiceBus.Features;
+using NServiceBus.Persistence;
 using NServiceBus.Unicast.Subscriptions;
 using NServiceBus.Unicast.Subscriptions.MessageDrivenSubscriptions;
+
+public class InMemoryPersistence : PersistenceDefinition
+{
+    internal InMemoryPersistence()
+    {
+        Supports<StorageType.Subscriptions>(s =>
+        {
+            s.EnableFeatureByDefault<InMemorySubscriptionPersistence>();
+        });
+    }
+}
+
+public static class InMemoryPersistenceExtensions
+{
+    public static void UseStorage(this PersistenceExtensions<InMemoryPersistence> extensions, InMemorySubscriptionStorage storageInstance)
+    {
+        extensions.GetSettings().Set("InMemoryPersistence.StorageInstance", storageInstance);
+    }
+}
+
+public class InMemorySubscriptionPersistence : Feature
+{
+    internal InMemorySubscriptionPersistence()
+    {
+        DependsOn<MessageDrivenSubscriptions>();
+    }
+
+    protected override void Setup(FeatureConfigurationContext context)
+    {
+        var storageInstance = context.Settings.GetOrDefault<InMemorySubscriptionStorage>("InMemoryPersistence.StorageInstance");
+        context.Container.RegisterSingleton<ISubscriptionStorage>(storageInstance ?? new InMemorySubscriptionStorage());
+    }
+}
 
 public class InMemorySubscriptionStorage : ISubscriptionStorage
 {
