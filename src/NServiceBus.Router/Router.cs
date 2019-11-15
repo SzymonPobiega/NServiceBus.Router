@@ -62,7 +62,6 @@ namespace NServiceBus.Router
             chains.AddChain(cb => cb.Begin<PublishPreroutingContext>().Terminate());
             chains.AddRule(c => new PublishPreroutingTerminator(interfaces.Select(i => i.Name).ToArray(), c.TypeGenerator));
             chains.AddChain(cb => cb.Begin<ForwardPublishContext>().Terminate());
-            chains.AddRule(c => new PostroutingVerificationRule());
 
             chains.AddRule(_ => new PreroutingToReplyPreroutingFork());
             chains.AddChain(cb => cb.Begin<ReplyPreroutingContext>().Terminate());

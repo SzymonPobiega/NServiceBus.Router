@@ -7,6 +7,9 @@
     /// </summary>
     public class ForwardPublishContext : BaseForwardRuleContext
     {
+        internal bool Forwarded;
+        internal bool Dropped;
+
         /// <summary>
         /// Creates new instance.
         /// </summary>
@@ -38,5 +41,22 @@
         /// The headers associated with the received message.
         /// </summary>
         public byte[] ReceivedBody { get; }
+
+        /// <summary>
+        /// Mark this message as forwarded.
+        /// </summary>
+        /// <returns></returns>
+        public void MarkForwarded()
+        {
+            Forwarded = true;
+        }
+
+        /// <summary>
+        /// Marks this message as OK to be dropped if no chain terminator forwards it.
+        /// </summary>
+        public void DoNotRequireThisMessageToBeForwarded()
+        {
+            Dropped = true;
+        }
     }
 }

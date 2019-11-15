@@ -17,26 +17,23 @@ class PublishPreroutingTerminator : ChainTerminator<PublishPreroutingContext>
     {
         var outgoingInterfaces = allInterfaces.Where(i => i != context.IncomingInterface);
 
-        var verificationState = new PostroutingVerificationRule.State(context.MessageId);
-
         var interfaces = context.Extensions.Get<IInterfaceChains>();
         var forkTasks = outgoingInterfaces
-            .Select(iface =>
+            .Select(async iface =>
             {
                 var chains = interfaces.GetChainsFor(iface);
                 var chain = chains.Get<ForwardPublishContext>();
                 var forwardPublishContext = new ForwardPublishContext(iface, typeGenerator.GetType(context.Types.First()), context);
-                forwardPublishContext.Extensions.Set(verificationState);
-                return chain.Invoke(forwardPublishContext);
+                await chain.Invoke(forwardPublishContext).ConfigureAwait(false);
+
+                return forwardPublishContext.Dropped || forwardPublishContext.Forwarded;
             });
 
-        await Task.WhenAll(forkTasks).ConfigureAwait(false);
-
-        if (!verificationState.HasBeenForwarded)
-        {
+        var results = await Task.WhenAll(forkTasks).ConfigureAwait(false);
+        if (!results.Any())
+        { 
             throw new UnforwardableMessageException($"The incoming message {context.MessageId} has not been forwarded. This might indicate a configuration problem.");
         }
-
         return true;
     }
 }
