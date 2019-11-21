@@ -23,7 +23,7 @@ class PublishPreroutingTerminator : ChainTerminator<PublishPreroutingContext>
             {
                 var chains = interfaces.GetChainsFor(iface);
                 var chain = chains.Get<ForwardPublishContext>();
-                var forwardPublishContext = new ForwardPublishContext(iface, typeGenerator.GetType(context.Types.First()), () => verificationState.MessageSent(context.MessageId), context);
+                var forwardPublishContext = new ForwardPublishContext(iface, typeGenerator.GetType(context.Types.First()), context);
                 await chain.Invoke(forwardPublishContext).ConfigureAwait(false);
 
                 return forwardPublishContext.Dropped || forwardPublishContext.Forwarded;
