@@ -8,19 +8,21 @@
     using AcceptanceTesting.Customization;
     using Configuration.AdvancedExtensibility;
     using Features;
+    using Migrator;
     using NServiceBus.AcceptanceTests;
     using NServiceBus.AcceptanceTests.EndpointTemplates;
     using NUnit.Framework;
     using Pipeline;
     using Routing;
     using Transport;
+    using Unicast.Messages;
     using Unicast.Subscriptions;
     using Unicast.Subscriptions.MessageDrivenSubscriptions;
     using Unicast.Transport;
     using InMemoryPersistence = global::InMemoryPersistence;
 
     [TestFixture]
-    public class When_migrating_subscriber_first : NServiceBusAcceptanceTest
+    public class When_migrating_transport : NServiceBusAcceptanceTest
     {
         const string SubRouterAddress = "SubRouter";
         const string PubRouterAddress = "PubRouter";
@@ -28,7 +30,7 @@
         static string SubscriberEndpointName => Conventions.EndpointNamingConvention(typeof(Subscriber));
 
         [Test]
-        public async Task Should_not_lose_events()
+        public async Task Should_not_lose_events_if_subscriber_is_migrated_first()
         {
             var subscriptionStorage = new InMemorySubscriptionStorage();
 
@@ -82,7 +84,7 @@
                     config.UsePersistence<InMemoryPersistence, StorageType.Subscriptions>().UseStorage(subscriptionStorage);
                 }).When(ctx => ctx.EndpointsStarted, s => s.Publish(new MyEvent())))
                 .WithEndpoint<MigratedSubscriber>()
-                .Done(c => c.EventsReceivedByMigratedSubscriber >= 1 && c.DuplicatePublishDropped)
+                .Done(c => c.EventsReceivedByMigratedSubscriber >= 1 && c.DuplicatePublishDetected)
                 .Run(TimeSpan.FromSeconds(30));
 
             Assert.IsTrue(publisherMigrated.EventsReceivedByMigratedSubscriber >= 1);
@@ -114,16 +116,6 @@
         [Test]
         public async Task Should_not_lose_events_if_publisher_is_migrated_first()
         {
-            /*
-             * A, B and C
-             * A publishes a
-             * C publishes c
-             * B subscribers to a and c
-             *
-             * 1. Migrate A - publisher is migrated while subscriber (B) is not
-             * 2. Migrate B - subscriber is migrated to join already migrated publisher (A), subscriber is migrated while publisher (C) is not
-             * 3. Migrate C - publisher is migrated to join already migrated subscriber (B)
-             */
             var subscriptionStorage = new InMemorySubscriptionStorage();
 
             var beforeMigration = await Scenario.Define<Context>()
@@ -194,10 +186,10 @@
                     await s.Subscribe(typeof(MyEvent));
                     ctx.Subscribed = true;
                 }))
-                .Done(c => c.EventsReceivedByMigratedSubscriber >= 1 && c.DuplicatePublishDropped)
+                .Done(c => c.EventsReceivedByMigratedSubscriber >= 1 && c.DuplicatePublishDetected)
                 .Run(TimeSpan.FromSeconds(30));
 
-            Assert.IsTrue(resubscribedNativeAfterMigration.DuplicatePublishDropped);
+            Assert.IsTrue(resubscribedNativeAfterMigration.DuplicatePublishDetected);
             Assert.AreEqual(1, resubscribedNativeAfterMigration.EventsReceivedByMigratedSubscriber);
 
             //Re-subscribe after migration. This will send a subscribe message that will trigger removal of old subscription -- Unsubscribed will be set
@@ -269,15 +261,15 @@
             public int EventsReceivedByMigratedSubscriber { get; set; }
             public string Step { get; set; }
             public bool Unsubscribed { get; set; }
-            public bool DuplicatePublishDropped { get; set; }
+            public bool DuplicatePublishDetected { get; set; }
         }
 
-        class UnsubscribeWhenMigratedBehavior : Behavior<IIncomingPhysicalMessageContext>
+        class UnsubscribeWhenMigratedDetector : Behavior<IIncomingPhysicalMessageContext>
         {
             ISubscriptionStorage subscriptionStorage;
             Context scenarioContext;
 
-            public UnsubscribeWhenMigratedBehavior(ISubscriptionStorage subscriptionStorage, Context scenarioContext)
+            public UnsubscribeWhenMigratedDetector(ISubscriptionStorage subscriptionStorage, Context scenarioContext)
             {
                 this.subscriptionStorage = subscriptionStorage;
                 this.scenarioContext = scenarioContext;
@@ -300,7 +292,6 @@
                 {
                     if (subscriber.Endpoint == subscriberEndpoint)
                     {
-                        await subscriptionStorage.Unsubscribe(subscriber, messageType, context.Extensions).ConfigureAwait(false);
                         scenarioContext.Unsubscribed = true;
                     }
                 }
@@ -310,19 +301,32 @@
         class PublishRedirectionBehavior : Behavior<IRoutingContext>
         {
             string routerAddress;
+            ISubscriptionStorage subscriptionStorage;
+            MessageMetadataRegistry metadataRegistry;
 
-            public PublishRedirectionBehavior(string routerAddress)
+            public PublishRedirectionBehavior(string routerAddress, ISubscriptionStorage subscriptionStorage, MessageMetadataRegistry metadataRegistry)
             {
                 this.routerAddress = routerAddress;
+                this.subscriptionStorage = subscriptionStorage;
+                this.metadataRegistry = metadataRegistry;
             }
 
-            public override Task Invoke(IRoutingContext context, Func<Task> next)
+            public override async Task Invoke(IRoutingContext context, Func<Task> next)
             {
+                var messageType = context.Extensions.Get<OutgoingLogicalMessage>().MessageType;
+                var allMessageTypes = metadataRegistry.GetMessageMetadata(messageType).MessageHierarchy;
+                var subscribers = await subscriptionStorage.GetSubscriberAddressesForMessage(allMessageTypes.Select(t => new MessageType(t)), context.Extensions).ConfigureAwait(false);
+
                 var newStrategies = new List<RoutingStrategy>();
-                var ignores = context.RoutingStrategies.OfType<UnicastRoutingStrategy>()
+                var unicastDestinations = context.RoutingStrategies.OfType<UnicastRoutingStrategy>()
                     .Select(x => x.Apply(new Dictionary<string, string>()))
                     .Cast<UnicastAddressTag>()
                     .Select(t => t.Destination)
+                    .ToArray();
+
+                //We tell endpoints to which we send unicast messages to ignore the multicast message
+                var ignores = subscribers.Where(s => s.Endpoint != null && unicastDestinations.Contains(s.TransportAddress))
+                    .Select(s => s.Endpoint)
                     .ToArray();
 
                 foreach (var strategy in context.RoutingStrategies)
@@ -344,16 +348,16 @@
                 }
 
                 context.RoutingStrategies = newStrategies;
-                return next();
+                await next().ConfigureAwait(false);
             }
         }
 
-        class IgnoreDuplicatesBehavior : Behavior<IIncomingPhysicalMessageContext>
+        class IgnoreDuplicatesDetector : Behavior<IIncomingPhysicalMessageContext>
         {
             string oldTransportAddress;
             Context scenarioContext;
 
-            public IgnoreDuplicatesBehavior(string oldTransportAddress, Context scenarioContext)
+            public IgnoreDuplicatesDetector(string oldTransportAddress, Context scenarioContext)
             {
                 this.oldTransportAddress = oldTransportAddress;
                 this.scenarioContext = scenarioContext;
@@ -372,10 +376,8 @@
                 if (ignoreAddresses.Contains(oldTransportAddress))
                 {
                     //This messages has also been sent via message-driven pub sub so we can ignore this one
-                    scenarioContext.DuplicatePublishDropped = true;
-                    return Task.CompletedTask;
+                    scenarioContext.DuplicatePublishDetected = true;
                 }
-
                 return next();
             }
         }
@@ -626,7 +628,7 @@
                     c.GetSettings().Set("NServiceBus.Subscriptions.EnableMigrationMode", true);
                     //Treat all addresses as old
                     c.Pipeline.Register(new PublishRedirectionBehavior(PubRouterAddress), "Redirects events to the router.");
-                    c.Pipeline.Register(b => new UnsubscribeWhenMigratedBehavior(b.Build<ISubscriptionStorage>(), b.Build<Context>()), "Removes old subscriptions");
+                    c.Pipeline.Register(b => new UnsubscribeWhenMigratedDetector(b.Build<ISubscriptionStorage>(), b.Build<Context>()), "Removes old subscriptions");
                 }).CustomEndpointName(PublisherEndpointName);
             }
         }
@@ -677,12 +679,21 @@
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    var routing = c.UseTransport<TestTransport>().BrokerYankee().Routing();
-                    var router = routing.ConnectToRouter(SubRouterAddress);
-                    router.RegisterPublisher(typeof(MyEvent), PublisherEndpointName);
+                    
                     c.DisableFeature<AutoSubscribe>();
+
+                    c.EnableTransportMigration<TestTransport, TestTransport>(to =>
+                    {
+                        c.UseTransport<TestTransport>().BrokerAlpha();
+                    }, tn =>
+                    {
+                        var routing = c.UseTransport<TestTransport>().BrokerYankee().Routing();
+                        var router = routing.ConnectToRouter(SubRouterAddress);
+                        router.RegisterPublisher(typeof(MyEvent), PublisherEndpointName);
+                    });
+
                     c.GetSettings().Set("NServiceBus.Subscriptions.EnableMigrationMode", true);
-                    c.Pipeline.Register(b => new IgnoreDuplicatesBehavior($"{SubscriberEndpointName}@Alpha", b.Build<Context>()), 
+                    c.Pipeline.Register(b => new IgnoreDuplicatesDetector($"{SubscriberEndpointName}@Alpha", b.Build<Context>()), 
                         "Ignores events published both natively and via message driven pub sub");
                 }).CustomEndpointName(SubscriberEndpointName);
             }
@@ -712,7 +723,7 @@
                 {
                     c.UseTransport<TestTransport>().BrokerYankee();
                     c.DisableFeature<AutoSubscribe>();
-                    c.Pipeline.Register(b => new IgnoreDuplicatesBehavior($"{SubscriberEndpointName}@Alpha", b.Build<Context>()),
+                    c.Pipeline.Register(b => new IgnoreDuplicatesDetector($"{SubscriberEndpointName}@Alpha", b.Build<Context>()),
                         "Ignores events published both natively and via message driven pub sub");
                 }).CustomEndpointName(SubscriberEndpointName);
             }
