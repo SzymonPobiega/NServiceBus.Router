@@ -4,7 +4,7 @@
     using System.Threading.Tasks;
     using Transport;
 
-    class ForwardSubscribeUnmodifiedRule : ChainTerminator<ForwardSubscribeContext>
+    class ForwardSubscribeRule : ChainTerminator<ForwardSubscribeContext>
     {
         protected override async Task<bool> Terminate(ForwardSubscribeContext context)
         {

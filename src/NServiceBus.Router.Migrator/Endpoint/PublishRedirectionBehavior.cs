@@ -12,15 +12,21 @@
 
     class PublishRedirectionBehavior : Behavior<IRoutingContext>
     {
-        string routerAddress;
+        string routerEndpoint;
         ISubscriptionStorage subscriptionStorage;
         MessageMetadataRegistry metadataRegistry;
+        EndpointInstances endpointInstances;
+        IDistributionPolicy distributionPolicy;
+        Func<EndpointInstance, string> toTransportAddress;
 
-        public PublishRedirectionBehavior(string routerAddress, ISubscriptionStorage subscriptionStorage, MessageMetadataRegistry metadataRegistry)
+        public PublishRedirectionBehavior(string routerEndpoint, ISubscriptionStorage subscriptionStorage, MessageMetadataRegistry metadataRegistry, EndpointInstances endpointInstances, IDistributionPolicy distributionPolicy, Func<EndpointInstance, string> toTransportAddress)
         {
-            this.routerAddress = routerAddress;
+            this.routerEndpoint = routerEndpoint;
             this.subscriptionStorage = subscriptionStorage;
             this.metadataRegistry = metadataRegistry;
+            this.endpointInstances = endpointInstances;
+            this.distributionPolicy = distributionPolicy;
+            this.toTransportAddress = toTransportAddress;
         }
 
         public override async Task Invoke(IRoutingContext context, Func<Task> next)
@@ -40,6 +46,8 @@
             var ignores = subscribers.Where(s => s.Endpoint != null && unicastDestinations.Contains(s.TransportAddress))
                 .Select(s => s.Endpoint)
                 .ToArray();
+
+            var routerAddress = SelectRouterAddress(context);
 
             foreach (var strategy in context.RoutingStrategies)
             {
@@ -61,6 +69,16 @@
 
             context.RoutingStrategies = newStrategies;
             await next().ConfigureAwait(false);
+        }
+
+        string SelectRouterAddress(IRoutingContext context)
+        {
+            var routerEndpointInstances = endpointInstances.FindInstances(routerEndpoint);
+            var routerAddresses = routerEndpointInstances.Select(toTransportAddress).ToArray();
+            var distStrategy = distributionPolicy.GetDistributionStrategy(routerEndpoint, DistributionStrategyScope.Send);
+            var distContext = new DistributionContext(routerAddresses, context.Extensions.Get<OutgoingLogicalMessage>(), context.Message.MessageId, context.Message.Headers, toTransportAddress, context.Extensions);
+            var routerAddress = distStrategy.SelectDestination(distContext);
+            return routerAddress;
         }
 
         class IgnoreMulticastRoutingStrategy : RoutingStrategy

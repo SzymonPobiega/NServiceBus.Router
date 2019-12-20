@@ -4,11 +4,11 @@
     using Routing;
     using Transport;
 
-    class ShadowForwardPublishRule : ChainTerminator<ForwardPublishContext>
+    class ForwardPublishRule : ChainTerminator<ForwardPublishContext>
     {
         string fixedDestination;
 
-        public ShadowForwardPublishRule(string fixedDestination)
+        public ForwardPublishRule(string fixedDestination)
         {
             this.fixedDestination = fixedDestination;
         }

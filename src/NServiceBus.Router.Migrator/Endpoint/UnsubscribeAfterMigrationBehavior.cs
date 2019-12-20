@@ -6,11 +6,11 @@
     using Unicast.Subscriptions;
     using Unicast.Subscriptions.MessageDrivenSubscriptions;
 
-    class UnsubscribeWhenMigratedBehavior : Behavior<IIncomingPhysicalMessageContext>
+    class UnsubscribeAfterMigrationBehavior : Behavior<IIncomingPhysicalMessageContext>
     {
         ISubscriptionStorage subscriptionStorage;
 
-        public UnsubscribeWhenMigratedBehavior(ISubscriptionStorage subscriptionStorage)
+        public UnsubscribeAfterMigrationBehavior(ISubscriptionStorage subscriptionStorage)
         {
             this.subscriptionStorage = subscriptionStorage;
         }
@@ -18,6 +18,12 @@
         public override async Task Invoke(IIncomingPhysicalMessageContext context, Func<Task> next)
         {
             await next();
+
+            if (subscriptionStorage == null)
+            {
+                //Storage-driven pub/sub is not enabled
+                return;
+            }
 
             if (!context.MessageHeaders.TryGetValue("NServiceBus.Router.Migrator.UnsubscribeEndpoint", out var subscriberEndpoint)
                 || !context.MessageHeaders.TryGetValue("NServiceBus.Router.Migrator.UnsubscribeType", out var messageTypeString))

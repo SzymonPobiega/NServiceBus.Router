@@ -1,6 +1,7 @@
 ﻿namespace NServiceBus.Router.Migrator
 {
     using System;
+    using System.Linq;
     using System.Threading.Tasks;
     using Configuration.AdvancedExtensibility;
     using Features;
@@ -25,46 +26,76 @@
         /// <param name="endpointConfiguration">Endpoint configuration</param>
         /// <param name="customizeOldTransport">A callback for customizing the old transport</param>
         /// <param name="customizeNewTransport">A callback for customizing the new transport</param>
-        public static void EnableTransportMigration<TOld, TNew>(this EndpointConfiguration endpointConfiguration,
+        public static MigratorSettings EnableTransportMigration<TOld, TNew>(this EndpointConfiguration endpointConfiguration,
             Action<TransportExtensions<TOld>> customizeOldTransport, Action<TransportExtensions<TNew>> customizeNewTransport)
         where TOld : TransportDefinition, new()
         where TNew : TransportDefinition, new()
         {
             //TODO: Installers
 
+            var settings = endpointConfiguration.GetSettings();
+            settings.Set("NServiceBus.Subscriptions.EnableMigrationMode", true);
+
             var endpointTransport = endpointConfiguration.UseTransport<TNew>();
             customizeNewTransport(endpointTransport);
 
-            endpointConfiguration.GetSettings().Set(NewTransportCustomizationSettingsKey, customizeNewTransport);
-            endpointConfiguration.GetSettings().Set(OldTransportCustomizationSettingsKey, customizeOldTransport);
+            settings.Set(NewTransportCustomizationSettingsKey, customizeNewTransport);
+            settings.Set(OldTransportCustomizationSettingsKey, customizeOldTransport);
 
-            endpointConfiguration.EnableFeature<MigratorFeature<TOld, TNew>>();
+            var setup = new MigratorSetup<TOld,TNew>();
+            settings.Set("NServiceBus.Router.Migrator.Setup", setup);
+            endpointConfiguration.EnableFeature<MigratorFeature>();
+
+            var migratorSettings = settings.GetOrCreate<MigratorSettings>();
+            return migratorSettings;
         }
     }
 
-    class MigratorFeature<TOld, TNew> : Feature
-      where TOld : TransportDefinition, new()
-      where TNew : TransportDefinition, new()
+    class MigratorFeature : Feature
     {
         protected override void Setup(FeatureConfigurationContext context)
         {
+            var setupInstance = (IMigratorSetup)context.Settings.Get("NServiceBus.Router.Migrator.Setup");
+            setupInstance.Setup(context);
+        }
+    }
+
+    interface IMigratorSetup
+    {
+        void Setup(FeatureConfigurationContext context);
+    }
+
+    class MigratorSetup<TOld, TNew> : IMigratorSetup
+      where TOld : TransportDefinition, new()
+      where TNew : TransportDefinition, new()
+    {
+        public void Setup(FeatureConfigurationContext context)
+        {
             var mainEndpointName = context.Settings.EndpointName();
             var routerEndpointName = $"{mainEndpointName}_Migrator";
+            var settings = context.Settings.Get<MigratorSettings>();
 
             var transportInfrastructure = context.Settings.Get<TransportInfrastructure>();
 
             var customizeOldTransport = context.Settings.Get<Action<TransportExtensions<TOld>>>(MigratorConfigurationExtensions.OldTransportCustomizationSettingsKey);
             var customizeNewTransport = context.Settings.Get<Action<TransportExtensions<TNew>>>(MigratorConfigurationExtensions.NewTransportCustomizationSettingsKey);
 
-            var routerAddress = transportInfrastructure.ToTransportAddress(LogicalAddress.CreateRemoteAddress(new EndpointInstance(routerEndpointName)));
+            var endpointInstances = context.Settings.Get<EndpointInstances>();
+            var distributionPolicy = context.Settings.Get<DistributionPolicy>();
+            string toTransportAddress(EndpointInstance x) => transportInfrastructure.ToTransportAddress(LogicalAddress.CreateRemoteAddress(x));
 
-            context.Pipeline.Register(b => new PublishRedirectionBehavior(routerAddress, b.Build<ISubscriptionStorage>(), b.Build<MessageMetadataRegistry>()),
+            context.Pipeline.Register(b => new PublishRedirectionBehavior(routerEndpointName,
+                    b.Build<ISubscriptionStorage>(), b.Build<MessageMetadataRegistry>(),
+                    endpointInstances, distributionPolicy, toTransportAddress),
                 "Redirects publishes that target old transport address via the router");
 
-            context.Pipeline.Register(b => new UnsubscribeWhenMigratedBehavior(b.Build<ISubscriptionStorage>()),
+            context.Pipeline.Register(b => new UnsubscribeAfterMigrationBehavior(b.BuildAll<ISubscriptionStorage>().FirstOrDefault()),
                 "Removes old transport subscriptions when a new transport subscription for the same event and endpoint comes in");
 
             context.Pipeline.Register(new IgnoreDuplicatesBehavior(mainEndpointName), "Ignores duplicates when publishing both natively and message-driven");
+
+            context.Pipeline.Register(b => new SubscribeBehavior(context.Settings.LocalAddress(), context.Settings.EndpointName(), routerEndpointName, b.Build<IDispatchMessages>(), settings.PublisherTable, toTransportAddress),
+                "Dispatches the subscribe request via a router.");
 
             var routerConfig = PrepareRouterConfiguration(routerEndpointName, mainEndpointName, context.Settings.LocalAddress(), customizeOldTransport, customizeNewTransport);
             context.RegisterStartupTask(new MigratorStartupTask(routerConfig));
@@ -74,14 +105,14 @@
         {
             var cfg = new RouterConfiguration(routerEndpointName);
 
-            var bravoInterface = cfg.AddInterface("New", customizeNewTransport);
-            bravoInterface.DisableMessageDrivenPublishSubscribe();
+            var newInterface = cfg.AddInterface("New", customizeNewTransport);
+            newInterface.DisableNativePubSub();
 
             //Forward unmodified subscribe messages from migrated subscriber
-            bravoInterface.AddRule(c => new ForwardSubscribeUnmodifiedRule());
+            newInterface.AddRule(c => new ForwardSubscribeRule());
 
             //Forward published events from shadow interface to migrated subscriber
-            bravoInterface.AddRule(c => new ShadowForwardPublishRule(mainEndpointAddress));
+            newInterface.AddRule(c => new ForwardPublishRule(mainEndpointAddress));
 
             var shadowInterface = cfg.AddInterface("Shadow", customizeOldTransport);
             shadowInterface.DisableMessageDrivenPublishSubscribe();
