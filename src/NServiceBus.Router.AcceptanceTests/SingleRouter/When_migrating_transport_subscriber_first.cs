@@ -20,7 +20,6 @@
     {
         static string PublisherEndpointName => Conventions.EndpointNamingConvention(typeof(Publisher));
         static string SubscriberEndpointName => Conventions.EndpointNamingConvention(typeof(Subscriber));
-        static string SubRouterAddress => SubscriberEndpointName + "_Migrator";
 
         [Test]
         public async Task Should_not_lose_events()
@@ -141,23 +140,6 @@
                 var isSubscribed = allSubscribers.Any(s => s.Endpoint == subscriberEndpoint);
 
                 scenarioContext.Unsubscribed = wasSubscribed && !isSubscribed;
-            }
-        }
-
-        /// <summary>
-        /// Ensures that unsubscribe message is ignored in order to check if de-duplication works
-        /// </summary>
-        class UnsubscribeWhenMigratedSuppressingBehavior : Behavior<ITransportReceiveContext>
-        {
-            public override async Task Invoke(ITransportReceiveContext context, Func<Task> next)
-            {
-                if (context.Message.Headers.TryGetValue("NServiceBus.Router.Migrator.UnsubscribeEndpoint", out _)
-                    || context.Message.Headers.TryGetValue("NServiceBus.Router.Migrator.UnsubscribeType", out _))
-                {
-                    return;
-                }
-
-                await next();
             }
         }
 

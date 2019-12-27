@@ -11,14 +11,13 @@ namespace NServiceBus.Router.Migrator
 {
     class SubscribeBehavior : Behavior<ISubscribeContext>
     {
-        public SubscribeBehavior(string subscriberAddress, string subscriberEndpoint, string routerEndpoint, IDispatchMessages dispatcher, Dictionary<Type, string> publisherTable, Func<EndpointInstance, string> toTransportAddress)
+        public SubscribeBehavior(string subscriberAddress, string subscriberEndpoint, string routerAddress, IDispatchMessages dispatcher, Dictionary<Type, string> publisherTable)
         {
             this.subscriberAddress = subscriberAddress;
             this.subscriberEndpoint = subscriberEndpoint;
+            this.routerAddress = routerAddress;
             this.dispatcher = dispatcher;
             this.publisherTable = publisherTable;
-            routerAddress = toTransportAddress(new EndpointInstance(routerEndpoint));
-
         }
 
         public override async Task Invoke(ISubscribeContext context, Func<Task> next)

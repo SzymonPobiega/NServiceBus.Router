@@ -80,13 +80,9 @@
             var customizeOldTransport = context.Settings.Get<Action<TransportExtensions<TOld>>>(MigratorConfigurationExtensions.OldTransportCustomizationSettingsKey);
             var customizeNewTransport = context.Settings.Get<Action<TransportExtensions<TNew>>>(MigratorConfigurationExtensions.NewTransportCustomizationSettingsKey);
 
-            var endpointInstances = context.Settings.Get<EndpointInstances>();
-            var distributionPolicy = context.Settings.Get<DistributionPolicy>();
-            string toTransportAddress(EndpointInstance x) => transportInfrastructure.ToTransportAddress(LogicalAddress.CreateRemoteAddress(x));
+            var routerAddress = transportInfrastructure.ToTransportAddress(LogicalAddress.CreateRemoteAddress(new EndpointInstance(routerEndpointName)));
 
-            context.Pipeline.Register(b => new PublishRedirectionBehavior(routerEndpointName,
-                    b.Build<ISubscriptionStorage>(), b.Build<MessageMetadataRegistry>(),
-                    endpointInstances, distributionPolicy, toTransportAddress),
+            context.Pipeline.Register(b => new PublishRedirectionBehavior(routerAddress, b.Build<ISubscriptionStorage>(), b.Build<MessageMetadataRegistry>()),
                 "Redirects publishes that target old transport address via the router");
 
             context.Pipeline.Register(b => new UnsubscribeAfterMigrationBehavior(b.BuildAll<ISubscriptionStorage>().FirstOrDefault()),
@@ -94,7 +90,7 @@
 
             context.Pipeline.Register(new IgnoreDuplicatesBehavior(mainEndpointName), "Ignores duplicates when publishing both natively and message-driven");
 
-            context.Pipeline.Register(b => new SubscribeBehavior(context.Settings.LocalAddress(), context.Settings.EndpointName(), routerEndpointName, b.Build<IDispatchMessages>(), settings.PublisherTable, toTransportAddress),
+            context.Pipeline.Register(b => new SubscribeBehavior(context.Settings.LocalAddress(), context.Settings.EndpointName(), routerAddress, b.Build<IDispatchMessages>(), settings.PublisherTable),
                 "Dispatches the subscribe request via a router.");
 
             var routerConfig = PrepareRouterConfiguration(routerEndpointName, mainEndpointName, context.Settings.LocalAddress(), customizeOldTransport, customizeNewTransport);

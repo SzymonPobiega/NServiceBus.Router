@@ -20,7 +20,6 @@
     {
         static string PublisherEndpointName => Conventions.EndpointNamingConvention(typeof(Publisher));
         static string SubscriberEndpointName => Conventions.EndpointNamingConvention(typeof(Subscriber));
-        static string SubRouterAddress => SubscriberEndpointName + "_Migrator";
 
         [Test]
         public async Task Should_not_lose_events()
