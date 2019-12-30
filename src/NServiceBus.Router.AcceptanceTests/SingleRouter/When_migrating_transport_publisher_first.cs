@@ -43,7 +43,10 @@
                 .WithEndpoint<MigratedPublisher>(c => c.CustomConfig(config =>
                 {
                     config.UsePersistence<InMemoryPersistence, StorageType.Subscriptions>().UseStorage(subscriptionStorage);
-                }).When(ctx => ctx.EndpointsStarted, s => s.Publish(new MyEvent())))
+                }).When(ctx => ctx.EndpointsStarted, s =>
+                {
+                    return s.Publish(new MyEvent());
+                }))
                 .WithEndpoint<Subscriber>()
                 .Done(c => c.EventReceivedByNonMigratedSubscriber)
                 .Run(TimeSpan.FromSeconds(30));

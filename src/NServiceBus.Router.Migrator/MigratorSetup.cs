@@ -74,7 +74,8 @@
             var mainEndpointName = context.Settings.EndpointName();
             var routerEndpointName = $"{mainEndpointName}_Migrator";
             var settings = context.Settings.Get<MigratorSettings>();
-
+            var unicastRouteTable = context.Settings.Get<UnicastRoutingTable>();
+            var distributionPolicy = context.Settings.Get<DistributionPolicy>();
             var transportInfrastructure = context.Settings.Get<TransportInfrastructure>();
 
             var customizeOldTransport = context.Settings.Get<Action<TransportExtensions<TOld>>>(MigratorConfigurationExtensions.OldTransportCustomizationSettingsKey);
@@ -82,15 +83,22 @@
 
             var routerAddress = transportInfrastructure.ToTransportAddress(LogicalAddress.CreateRemoteAddress(new EndpointInstance(routerEndpointName)));
 
-            context.Pipeline.Register(b => new PublishRedirectionBehavior(routerAddress, b.Build<ISubscriptionStorage>(), b.Build<MessageMetadataRegistry>()),
-                "Redirects publishes that target old transport address via the router");
+            var route = UnicastRoute.CreateFromPhysicalAddress(routerAddress);
+            var routes = settings.SendRouteTable.Select(x => new RouteTableEntry(x.Key, route)).ToList();
+            unicastRouteTable.AddOrReplaceRoutes("NServiceBus.Router", routes);
+
+            context.Pipeline.Register(new MigratorRouterDestinationBehavior(settings.SendRouteTable), 
+                "Sets the ultimate destination endpoint on the outgoing messages.");
+
+            context.Pipeline.Replace("MigrationModePublishConnector", b => new DualRoutingPublishConnector(routerAddress, distributionPolicy, b.Build<MessageMetadataRegistry>(), i => transportInfrastructure.ToTransportAddress(LogicalAddress.CreateRemoteAddress(i)), b.Build<ISubscriptionStorage>()), 
+                "Routes published messages via router and publishes them natively");
 
             context.Pipeline.Register(b => new UnsubscribeAfterMigrationBehavior(b.BuildAll<ISubscriptionStorage>().FirstOrDefault()),
                 "Removes old transport subscriptions when a new transport subscription for the same event and endpoint comes in");
 
-            context.Pipeline.Register(new IgnoreDuplicatesBehavior(mainEndpointName), "Ignores duplicates when publishing both natively and message-driven");
+            context.Pipeline.Register(new DualRoutingFilterBehavior(mainEndpointName), "Ignores duplicates when publishing both natively and message-driven");
 
-            context.Pipeline.Register(b => new SubscribeBehavior(context.Settings.LocalAddress(), context.Settings.EndpointName(), routerAddress, b.Build<IDispatchMessages>(), settings.PublisherTable),
+            context.Pipeline.Register(b => new MigratorRouterSubscribeBehavior(context.Settings.LocalAddress(), context.Settings.EndpointName(), routerAddress, b.Build<IDispatchMessages>(), settings.PublisherTable),
                 "Dispatches the subscribe request via a router.");
 
             var routerConfig = PrepareRouterConfiguration(routerEndpointName, mainEndpointName, context.Settings.LocalAddress(), customizeOldTransport, customizeNewTransport);
@@ -124,6 +132,9 @@
 
             //Forward subscribes messages from shadow interface to migrated publisher
             shadowInterface.AddRule(c => new ShadowSubscribeDestinationRule(mainEndpointName));
+
+            //Forward sends from shadow interface to migrated receiver
+            shadowInterface.AddRule(c => new ShadowSendDestinationRule(mainEndpointName));
 
             var staticRouting = cfg.UseStaticRoutingProtocol();
             staticRouting.AddForwardRoute("New", "Shadow");

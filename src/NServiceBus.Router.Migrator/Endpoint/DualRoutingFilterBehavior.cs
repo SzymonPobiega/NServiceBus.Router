@@ -5,11 +5,11 @@
     using System.Threading.Tasks;
     using Pipeline;
 
-    class IgnoreDuplicatesBehavior : Behavior<IIncomingPhysicalMessageContext>
+    class DualRoutingFilterBehavior : Behavior<IIncomingPhysicalMessageContext>
     {
         string endpointName;
 
-        public IgnoreDuplicatesBehavior(string endpointName)
+        public DualRoutingFilterBehavior(string endpointName)
         {
             this.endpointName = endpointName;
         }

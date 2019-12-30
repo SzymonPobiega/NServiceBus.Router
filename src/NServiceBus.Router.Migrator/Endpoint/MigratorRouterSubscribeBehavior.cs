@@ -9,9 +9,9 @@ using NServiceBus.Unicast.Transport;
 
 namespace NServiceBus.Router.Migrator
 {
-    class SubscribeBehavior : Behavior<ISubscribeContext>
+    class MigratorRouterSubscribeBehavior : Behavior<ISubscribeContext>
     {
-        public SubscribeBehavior(string subscriberAddress, string subscriberEndpoint, string routerAddress, IDispatchMessages dispatcher, Dictionary<Type, string> publisherTable)
+        public MigratorRouterSubscribeBehavior(string subscriberAddress, string subscriberEndpoint, string routerAddress, IDispatchMessages dispatcher, Dictionary<Type, string> publisherTable)
         {
             this.subscriberAddress = subscriberAddress;
             this.subscriberEndpoint = subscriberEndpoint;
@@ -51,6 +51,6 @@ namespace NServiceBus.Router.Migrator
         string subscriberEndpoint;
         string routerAddress;
 
-        static ILog Logger = LogManager.GetLogger<SubscribeBehavior>();
+        static ILog Logger = LogManager.GetLogger<MigratorRouterSubscribeBehavior>();
     }
 }
