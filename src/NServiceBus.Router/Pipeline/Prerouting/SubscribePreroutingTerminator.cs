@@ -25,7 +25,7 @@ class SubscribePreroutingTerminator : ChainTerminator<SubscribePreroutingContext
             {
                 var chains = interfaces.GetChainsFor(iface);
                 var chain = chains.Get<ForwardSubscribeContext>();
-                return chain.Invoke(new ForwardSubscribeContext(iface, routes, typeGenerator.GetType(context.MessageType), context));
+                return chain.Invoke(new ForwardSubscribeContext(iface, routes, typeGenerator.GetType(context.MessageType), context.SubscriberEndpoint, context.SubscriberAddress, context));
             });
 
         await Task.WhenAll(forkTasks).ConfigureAwait(false);

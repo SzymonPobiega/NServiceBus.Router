@@ -5,6 +5,7 @@
     using System.IO;
     using System.Linq;
     using System.Threading.Tasks;
+    using AcceptanceTesting;
     using DelayedDelivery;
     using Performance.TimeToBeReceived;
     using Routing;
@@ -22,6 +23,8 @@
                 var solutionRoot = FindSolutionRoot();
                 storagePath = Path.Combine(solutionRoot, ".learningtransport");
             }
+
+            brokerName = settings.GetOrDefault<string>(BrokerNameKey) ?? "";
 
             var errorQueueAddress = settings.ErrorQueueAddress();
             PathChecker.ThrowForBadPath(errorQueueAddress, "ErrorQueueAddress");
@@ -74,7 +77,9 @@
         {
             var maxPayloadSize = settings.GetOrDefault<bool>(NoPayloadSizeRestrictionKey) ? int.MaxValue / 1024 : 64; //64 kB is the max size of the ASQ transport
 
-            return new TransportSendInfrastructure(() => new TestTransportDispatcher(storagePath, maxPayloadSize), () => Task.FromResult(StartupCheckResult.Success));
+            //var scenarioContext = settings.Get<ScenarioContext>();
+
+            return new TransportSendInfrastructure(() => new TestTransportDispatcher(storagePath, maxPayloadSize, brokerName, null), () => Task.FromResult(StartupCheckResult.Success));
         }
 
         public override TransportSubscriptionInfrastructure ConfigureSubscriptionInfrastructure()
@@ -116,13 +121,15 @@
                 address += "-" + qualifier;
             }
 
-            return address;
+            return $"{address}@{brokerName}";
         }
 
         string storagePath;
         SettingsHolder settings;
+        string brokerName;
 
         public const string StorageLocationKey = "TestTransport.StoragePath";
+        public const string BrokerNameKey = "TestTransport.BrokerNameKey";
         public const string NoPayloadSizeRestrictionKey = "TestTransport.NoPayloadSizeRestrictionKey";
         public const string NoNativePubSub = "TestTransport.NoNativePubSub";
     }

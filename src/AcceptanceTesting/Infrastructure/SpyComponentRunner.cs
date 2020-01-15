@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using NServiceBus;
+using NServiceBus.AcceptanceTesting;
 using NServiceBus.AcceptanceTesting.Support;
 using NServiceBus.Raw;
 using NServiceBus.Transport;
@@ -10,14 +11,16 @@ class SpyComponentRunner : ComponentRunner
 {
     Action<TransportExtensions<TestTransport>> transportConfiguration;
     Func<MessageContext, IDispatchMessages, Task> onMessage;
+    ScenarioContext scenarioContext;
     string endpointName;
     IReceivingRawEndpoint endpoint;
 
     public SpyComponentRunner(string endpointName, Action<TransportExtensions<TestTransport>> transportConfiguration,
-        Func<MessageContext, IDispatchMessages, Task> onMessage)
+        Func<MessageContext, IDispatchMessages, Task> onMessage, ScenarioContext scenarioContext)
     {
         this.transportConfiguration = transportConfiguration;
         this.onMessage = onMessage;
+        this.scenarioContext = scenarioContext;
         this.endpointName = endpointName;
     }
 
@@ -27,6 +30,7 @@ class SpyComponentRunner : ComponentRunner
     {
         var config = RawEndpointConfiguration.Create(endpointName, onMessage, "poison");
         config.AutoCreateQueue();
+        config.Settings.Set<ScenarioContext>(scenarioContext);
         config.CustomErrorHandlingPolicy(new IgnoreErrorsPolicy());
         var transport = config.UseTransport<TestTransport>();
         transportConfiguration(transport);

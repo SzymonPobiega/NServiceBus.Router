@@ -7,6 +7,11 @@
     /// </summary>
     public static class TestTransportConfigurationExtensions
     {
+        public static void BrokerName(this TransportExtensions<TestTransport> transportExtensions, string brokerName)
+        {
+            transportExtensions.GetSettings().Set(TestTransportInfrastructure.BrokerNameKey, brokerName);
+        }
+
         /// <summary>
         /// Configures the location where message files are stored.
         /// </summary>

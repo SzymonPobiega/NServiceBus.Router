@@ -24,6 +24,6 @@ class SpyComponent<T> : IComponentBehavior
     {
         var scenarioContext = (T)run.ScenarioContext;
 
-        return Task.FromResult<ComponentRunner>(new SpyComponentRunner(endpointName, transportConfiguration, (messageContext, messages) => onMessage(scenarioContext, messageContext, messages)));
+        return Task.FromResult<ComponentRunner>(new SpyComponentRunner(endpointName, transportConfiguration, (messageContext, messages) => onMessage(scenarioContext, messageContext, messages), scenarioContext));
     }
 }

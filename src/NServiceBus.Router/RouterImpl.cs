@@ -18,7 +18,7 @@ class RouterImpl : IRouter
 
     public async Task Start()
     {
-        var rootContext = new RootContext(interfaceChains);
+        var rootContext = new RootContext(interfaceChains, name);
 
         await routingProtocol.Start(new RouterMetadata(name, interfaces.Keys.ToList())).ConfigureAwait(false);
 

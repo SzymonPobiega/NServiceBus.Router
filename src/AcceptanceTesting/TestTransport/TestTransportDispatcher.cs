@@ -6,14 +6,16 @@ namespace NServiceBus
     using System.Linq;
     using System.Text;
     using System.Threading.Tasks;
+    using AcceptanceTesting;
     using DelayedDelivery;
     using Extensibility;
     using Performance.TimeToBeReceived;
     using Transport;
+    using Unicast.Queuing;
 
     class TestTransportDispatcher : IDispatchMessages
     {
-        public TestTransportDispatcher(string basePath, int maxMessageSizeKB)
+        public TestTransportDispatcher(string basePath, int maxMessageSizeKB, string brokerName, ScenarioContext scenarioContext)
         {
             if (maxMessageSizeKB > int.MaxValue / 1024)
             {
@@ -22,6 +24,7 @@ namespace NServiceBus
 
             this.basePath = basePath;
             this.maxMessageSizeKB = maxMessageSizeKB;
+            this.brokerName = brokerName;
         }
 
         public Task Dispatch(TransportOperations outgoingMessages, TransportTransaction transaction, ContextBag context)
@@ -37,12 +40,23 @@ namespace NServiceBus
 
             foreach (var transportOperation in transportOperations)
             {
+                if (!transportOperation.Message.Headers.TryGetValue(Headers.MessageId, out var messageId))
+                {
+                    messageId = transportOperation.Message.MessageId;
+                }
+
+                if (!transportOperation.Message.Headers.TryGetValue(Headers.MessageIntent, out var intent))
+                {
+                    intent = "<Unknown>";
+                }
+
                 var subscribers = await GetSubscribersFor(transportOperation.MessageType)
                     .ConfigureAwait(false);
 
                 foreach (var subscriber in subscribers)
                 {
                     tasks.Add(WriteMessage(subscriber, transportOperation, transaction));
+                    Console.WriteLine($"Publishing message {messageId} with intent {intent} sent to {subscriber}");
                 }
             }
 
@@ -56,6 +70,17 @@ namespace NServiceBus
             {
                 PathChecker.ThrowForBadPath(operation.Destination, "message destination");
 
+                if (!operation.Message.Headers.TryGetValue(Headers.MessageId, out var messageId))
+                {
+                    messageId = operation.Message.MessageId;
+                }
+
+                if (!operation.Message.Headers.TryGetValue(Headers.MessageIntent, out var intent))
+                {
+                    intent = "<Unknown>";
+                }
+                Console.WriteLine($"Sending message {messageId} with intent {intent} sent to {operation.Destination}");
+
                 return WriteMessage(operation.Destination, operation, transaction);
             }));
         }
@@ -64,8 +89,31 @@ namespace NServiceBus
         {
             var message = transportOperation.Message;
 
+            if (destination.IndexOf("@", StringComparison.Ordinal) != -1)
+            {
+                var parts = destination.Split(new[] {'@'}, StringSplitOptions.RemoveEmptyEntries);
+
+                var broker = parts[1];
+
+                if (broker != brokerName)
+                {
+                    throw new Exception($"Attempt to send a message to broker {broker} through transport configured for {brokerName}.");
+                }
+            }
+            else
+            {
+                //Default to sending to local broker
+                destination = $"{destination}@{brokerName}";
+            }
+
             var nativeMessageId = Guid.NewGuid().ToString();
             var destinationPath = Path.Combine(basePath, destination);
+
+            if (!Directory.Exists(destinationPath))
+            {
+                throw new QueueNotFoundException(destination, "Destination queue does not exist.", null);
+            }
+
             var bodyDir = Path.Combine(destinationPath, TestTransportMessagePump.BodyDirName);
 
             Directory.CreateDirectory(bodyDir);
@@ -190,6 +238,7 @@ namespace NServiceBus
         static bool IsCoreMarkerInterface(Type type) => type == typeof(IMessage) || type == typeof(IEvent) || type == typeof(ICommand);
 
         int maxMessageSizeKB;
+        string brokerName;
         string basePath;
     }
 }
