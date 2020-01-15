@@ -11,6 +11,7 @@ namespace NServiceBus
     using Extensibility;
     using Performance.TimeToBeReceived;
     using Transport;
+    using Unicast.Queuing;
 
     class TestTransportDispatcher : IDispatchMessages
     {
@@ -107,6 +108,12 @@ namespace NServiceBus
 
             var nativeMessageId = Guid.NewGuid().ToString();
             var destinationPath = Path.Combine(basePath, destination);
+
+            if (!Directory.Exists(destinationPath))
+            {
+                throw new QueueNotFoundException(destination, "Destination queue does not exist.", null);
+            }
+
             var bodyDir = Path.Combine(destinationPath, TestTransportMessagePump.BodyDirName);
 
             Directory.CreateDirectory(bodyDir);

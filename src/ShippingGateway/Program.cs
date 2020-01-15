@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using NServiceBus;
+using NServiceBus.Router.Migrator;
 
 class Program
 {
@@ -12,10 +13,9 @@ class Program
         endpointConfiguration.SendFailedMessagesTo("error");
         endpointConfiguration.EnableInstallers();
 
-        //var transport = endpointConfiguration.UseTransport<SqlServerTransport>();
-        //transport.ConnectionString(ConnectionStrings.Transport);
-
-        endpointConfiguration.UseTransport<MsmqTransport>();
+        //ConfigureTransportMsmq(endpointConfiguration);
+        ConfigureTransportMigrationMode(endpointConfiguration);
+        //ConfigureTransportDrainMode(endpointConfiguration);
 
         var endpointInstance = await Endpoint.Start(endpointConfiguration)
             .ConfigureAwait(false);
@@ -23,5 +23,36 @@ class Program
         Console.ReadKey();
         await endpointInstance.Stop()
             .ConfigureAwait(false);
+    }
+
+    static void ConfigureTransportMsmq(EndpointConfiguration endpointConfiguration)
+    {
+        endpointConfiguration.UseTransport<MsmqTransport>();
+    }
+
+    static void ConfigureTransportMigrationMode(EndpointConfiguration endpointConfiguration)
+    {
+        endpointConfiguration.EnableTransportMigration<MsmqTransport, SqlServerTransport>(
+            msmq => { },
+            sql =>
+            {
+                sql.ConnectionString(ConnectionStrings.Transport);
+            });
+    }
+
+    static void ConfigureTransportDrainMode(EndpointConfiguration endpointConfiguration)
+    {
+        endpointConfiguration.EnableTransportMigration<MsmqTransport, SqlServerTransport>(
+            msmq => { },
+            sql =>
+            {
+                sql.ConnectionString(ConnectionStrings.Transport);
+            });
+    }
+
+    static void ConfigureTransportSql(EndpointConfiguration endpointConfiguration)
+    {
+        endpointConfiguration.UseTransport<SqlServerTransport>()
+            .ConnectionString(ConnectionStrings.Transport);
     }
 }

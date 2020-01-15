@@ -7,10 +7,16 @@ namespace NServiceBus.Router
     /// </summary>
     public class RootContext : ContextBag, IRuleContext
     {
-        internal RootContext(IInterfaceChains interfaces)
+        internal RootContext(IInterfaceChains interfaces, string routerName)
         {
+            RouterName = routerName;
             Set(interfaces);
         }
+
+        /// <summary>
+        /// The logical name of the router
+        /// </summary>
+        public string RouterName { get; }
 
         /// <summary>
         /// Router's interfaces.

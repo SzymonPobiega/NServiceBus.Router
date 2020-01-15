@@ -1,11 +1,28 @@
+## How to use it? 
+
+The migration mode runs a router co-hosted with its endpoint. The router's task it to move messages between the old and the new transport.
+When an endpoint is in the migration mode, it:
+- Sends commands to the old transport destination
+- Initially publishes using the old transport mechanism but gradually transitions to the new mechanism if possible
+- Is able to process messages sent both via old and new transport
+
+### Workflow
+
+- Switch endpoints to migration mode, one by one, retailing the original routing config (RouteToEndpoint & RegisterPublisher)
+- Once all endpoints have been switched to migration mode and the subscription storage for the old transport is empty, switch endpoints to drain mode, one by one. That means
+  - remove the RegisterPublisher calls
+  - move the RouteToEndpoint calls to the new transport config to ensure no new messages are sent via the old transport
+- Once all old transport queues are empty disable the migration mode and switch to the new transport
+
+
+## Migrating subscriber first
+
 ### Symbol definitions
 
 - `->` send message directly via a queue
 - `->>` pass message in-memory
 - `+>` subscribe natively
 - `=>` publish natively 
-
-## Migrating subscriber first
 
 ### Before migration
 

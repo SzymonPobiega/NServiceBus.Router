@@ -3,53 +3,11 @@
     using System;
     using System.Linq;
     using System.Threading.Tasks;
-    using Configuration.AdvancedExtensibility;
     using Features;
     using Routing;
     using Transport;
     using Unicast.Messages;
     using Unicast.Subscriptions.MessageDrivenSubscriptions;
-
-    /// <summary>
-    /// Configures migrator
-    /// </summary>
-    public static class MigratorConfigurationExtensions
-    {
-        internal const string NewTransportCustomizationSettingsKey = "NServiceBus.Router.Migrator.NewTransportCustomization";
-        internal const string OldTransportCustomizationSettingsKey = "NServiceBus.Router.Migrator.OldTransportCustomization";
-
-        /// <summary>
-        /// Enables transport migration for this endpoint.
-        /// </summary>
-        /// <typeparam name="TOld">Old transport</typeparam>
-        /// <typeparam name="TNew">New transport</typeparam>
-        /// <param name="endpointConfiguration">Endpoint configuration</param>
-        /// <param name="customizeOldTransport">A callback for customizing the old transport</param>
-        /// <param name="customizeNewTransport">A callback for customizing the new transport</param>
-        public static MigratorSettings EnableTransportMigration<TOld, TNew>(this EndpointConfiguration endpointConfiguration,
-            Action<TransportExtensions<TOld>> customizeOldTransport, Action<TransportExtensions<TNew>> customizeNewTransport)
-        where TOld : TransportDefinition, new()
-        where TNew : TransportDefinition, new()
-        {
-            //TODO: Installers
-
-            var settings = endpointConfiguration.GetSettings();
-            settings.Set("NServiceBus.Subscriptions.EnableMigrationMode", true);
-
-            var endpointTransport = endpointConfiguration.UseTransport<TNew>();
-            customizeNewTransport(endpointTransport);
-
-            settings.Set(NewTransportCustomizationSettingsKey, customizeNewTransport);
-            settings.Set(OldTransportCustomizationSettingsKey, customizeOldTransport);
-
-            var setup = new MigratorSetup<TOld,TNew>();
-            settings.Set("NServiceBus.Router.Migrator.Setup", setup);
-            endpointConfiguration.EnableFeature<MigratorFeature>();
-
-            var migratorSettings = settings.GetOrCreate<MigratorSettings>();
-            return migratorSettings;
-        }
-    }
 
     class MigratorFeature : Feature
     {
@@ -66,8 +24,8 @@
     }
 
     class MigratorSetup<TOld, TNew> : IMigratorSetup
-      where TOld : TransportDefinition, new()
-      where TNew : TransportDefinition, new()
+        where TOld : TransportDefinition, new()
+        where TNew : TransportDefinition, new()
     {
         public void Setup(FeatureConfigurationContext context)
         {
@@ -77,20 +35,25 @@
             var unicastRouteTable = context.Settings.Get<UnicastRoutingTable>();
             var distributionPolicy = context.Settings.Get<DistributionPolicy>();
             var transportInfrastructure = context.Settings.Get<TransportInfrastructure>();
+            var queueBindings = context.Settings.Get<QueueBindings>();
 
             var customizeOldTransport = context.Settings.Get<Action<TransportExtensions<TOld>>>(MigratorConfigurationExtensions.OldTransportCustomizationSettingsKey);
             var customizeNewTransport = context.Settings.Get<Action<TransportExtensions<TNew>>>(MigratorConfigurationExtensions.NewTransportCustomizationSettingsKey);
 
             var routerAddress = transportInfrastructure.ToTransportAddress(LogicalAddress.CreateRemoteAddress(new EndpointInstance(routerEndpointName)));
+            queueBindings.BindSending(routerAddress);
+
+
+            //context.RegisterStartupTask(b => new RoutingMonitor(unicastRouteTable, settings.SendRouteTable, route, b.Build<CriticalError>()));
 
             var route = UnicastRoute.CreateFromPhysicalAddress(routerAddress);
             var routes = settings.SendRouteTable.Select(x => new RouteTableEntry(x.Key, route)).ToList();
-            unicastRouteTable.AddOrReplaceRoutes("NServiceBus.Router", routes);
+            unicastRouteTable.AddOrReplaceRoutes("NServiceBus.Router.Migrator", routes);
 
-            context.Pipeline.Register(new MigratorRouterDestinationBehavior(settings.SendRouteTable), 
+            context.Pipeline.Register(new MigratorRouterDestinationBehavior(settings.SendRouteTable),
                 "Sets the ultimate destination endpoint on the outgoing messages.");
 
-            context.Pipeline.Replace("MigrationModePublishConnector", b => new DualRoutingPublishConnector(routerAddress, distributionPolicy, b.Build<MessageMetadataRegistry>(), i => transportInfrastructure.ToTransportAddress(LogicalAddress.CreateRemoteAddress(i)), b.Build<ISubscriptionStorage>()), 
+            context.Pipeline.Replace("MigrationModePublishConnector", b => new DualRoutingPublishConnector(routerAddress, distributionPolicy, b.Build<MessageMetadataRegistry>(), i => transportInfrastructure.ToTransportAddress(LogicalAddress.CreateRemoteAddress(i)), b.Build<ISubscriptionStorage>()),
                 "Routes published messages via router and publishes them natively");
 
             context.Pipeline.Register(b => new UnsubscribeAfterMigrationBehavior(b.BuildAll<ISubscriptionStorage>().FirstOrDefault()),
@@ -118,6 +81,7 @@
             //Forward published events from shadow interface to migrated subscriber
             newInterface.AddRule(c => new ForwardPublishRule(mainEndpointAddress));
 
+
             var shadowInterface = cfg.AddInterface("Shadow", customizeOldTransport);
             shadowInterface.DisableMessageDrivenPublishSubscribe();
 
@@ -136,9 +100,14 @@
             //Forward sends from shadow interface to migrated receiver
             shadowInterface.AddRule(c => new ShadowSendDestinationRule(mainEndpointName));
 
+            //Removes the destination header
+            shadowInterface.AddRule(_ => new ForwardSendRule());
+
             var staticRouting = cfg.UseStaticRoutingProtocol();
             staticRouting.AddForwardRoute("New", "Shadow");
             staticRouting.AddForwardRoute("Shadow", "New");
+
+            cfg.AutoCreateQueues(null);
 
             return cfg;
         }

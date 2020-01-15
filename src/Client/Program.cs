@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using NServiceBus;
+using NServiceBus.Router.Migrator;
 
 class Program
 {
@@ -16,12 +17,9 @@ class Program
         endpointConfiguration.SendFailedMessagesTo("error");
         endpointConfiguration.EnableInstallers();
 
-        //var transport = endpointConfiguration.UseTransport<SqlServerTransport>();
-        //transport.ConnectionString(ConnectionStrings.Transport);
-
-        var transport = endpointConfiguration.UseTransport<MsmqTransport>();
-        transport.Routing().RouteToEndpoint(typeof(PlaceOrder), "Migrator.Sales");
-        transport.Routing().RegisterPublisher(typeof(OrderCompleted), "Migrator.Sales");
+        //ConfigureTransportMsmq(endpointConfiguration);
+        ConfigureTransportMigrationMode(endpointConfiguration);
+        //ConfigureTransportDrainMode(endpointConfiguration);
 
         var endpointInstance = await Endpoint.Start(endpointConfiguration)
             .ConfigureAwait(false);
@@ -48,5 +46,42 @@ class Program
         }
         await endpointInstance.Stop()
             .ConfigureAwait(false);
+    }
+
+    static void ConfigureTransportMsmq(EndpointConfiguration endpointConfiguration)
+    {
+        var routing = endpointConfiguration.UseTransport<MsmqTransport>().Routing();
+        routing.RouteToEndpoint(typeof(PlaceOrder), "Migrator.Sales");
+        routing.RegisterPublisher(typeof(OrderCompleted), "Migrator.Sales");
+    }
+
+    static void ConfigureTransportMigrationMode(EndpointConfiguration endpointConfiguration)
+    {
+        var routing = endpointConfiguration.EnableTransportMigration<MsmqTransport, SqlServerTransport>(
+            msmq => { },
+            sql =>
+            {
+                sql.ConnectionString(ConnectionStrings.Transport);
+            });
+        routing.RouteToEndpoint(typeof(PlaceOrder), "Migrator.Sales");
+        routing.RegisterPublisher(typeof(OrderCompleted), "Migrator.Sales");
+    }
+
+    static void ConfigureTransportDrainMode(EndpointConfiguration endpointConfiguration)
+    {
+        endpointConfiguration.EnableTransportMigration<MsmqTransport, SqlServerTransport>(
+            msmq => { },
+            sql =>
+            {
+                sql.ConnectionString(ConnectionStrings.Transport);
+                sql.Routing().RouteToEndpoint(typeof(PlaceOrder), "Migrator.Sales");
+            });
+    }
+
+    static void ConfigureTransportSql(EndpointConfiguration endpointConfiguration)
+    {
+        var routing = endpointConfiguration.UseTransport<SqlServerTransport>()
+            .ConnectionString(ConnectionStrings.Transport).Routing();
+        routing.RouteToEndpoint(typeof(PlaceOrder), "Migrator.Sales");
     }
 }
