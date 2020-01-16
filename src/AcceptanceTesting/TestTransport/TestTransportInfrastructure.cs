@@ -70,7 +70,8 @@
 
         public override TransportReceiveInfrastructure ConfigureReceiveInfrastructure()
         {
-            return new TransportReceiveInfrastructure(() => new TestTransportMessagePump(storagePath), () => new TestTransportQueueCreator(), () => Task.FromResult(StartupCheckResult.Success));
+            return new TransportReceiveInfrastructure(() => new TestTransportMessagePump(storagePath), 
+                () => new TestTransportQueueCreator(storagePath), () => Task.FromResult(StartupCheckResult.Success));
         }
 
         public override TransportSendInfrastructure ConfigureSendInfrastructure()

@@ -10,19 +10,22 @@
     /// </summary>
     public class PreroutingContext : BasePreroutingContext
     {
+        internal bool Forwarded;
+        internal bool Dropped;
+
         internal PreroutingContext(RawContext parent) : base(parent)
         {
             Body = parent.Body;
-            Intent = GetMesssageIntent(parent.Headers);
+            Intent = GetMessageIntent(parent.Headers);
         }
-        static MessageIntentEnum? GetMesssageIntent(IReadOnlyDictionary<string, string> headers)
+        static MessageIntentEnum? GetMessageIntent(IReadOnlyDictionary<string, string> headers)
         {
-            var messageIntent = default(MessageIntentEnum);
             if (headers.TryGetValue(NServiceBus.Headers.MessageIntent, out var messageIntentString))
             {
-                Enum.TryParse(messageIntentString, true, out messageIntent);
+                Enum.TryParse<MessageIntentEnum>(messageIntentString, true, out var messageIntent);
+                return messageIntent;
             }
-            return messageIntent;
+            return null;
         }
 
         /// <summary>
@@ -34,5 +37,22 @@
         /// The body of the received message.
         /// </summary>
         public byte[] Body { get; set; }
+
+        /// <summary>
+        /// Mark this message as forwarded.
+        /// </summary>
+        /// <returns></returns>
+        public void MarkForwarded()
+        {
+            Forwarded = true;
+        }
+
+        /// <summary>
+        /// Marks this message as OK to be dropped if no chain terminator forwards it.
+        /// </summary>
+        public void DoNotRequireThisMessageToBeForwarded()
+        {
+            Dropped = true;
+        }
     }
 }

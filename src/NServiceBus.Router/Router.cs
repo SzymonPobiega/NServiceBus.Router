@@ -35,6 +35,7 @@ namespace NServiceBus.Router
             chains.AddChain(cb => cb.Begin<RawContext>().AddSection<PreroutingContext>().Terminate());
             chains.AddRule(_ => new RawToPreroutingConnector());
             chains.AddRule(c => new DetectCyclesRule(c.Endpoint.EndpointName));
+            chains.AddRule(_ => new PreroutingTerminator());
 
             chains.AddRule(_ => new PreroutingToSubscribePreroutingFork());
 

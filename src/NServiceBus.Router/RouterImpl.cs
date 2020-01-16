@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using NServiceBus.Logging;
@@ -16,15 +17,29 @@ class RouterImpl : IRouter
         this.interfaces = interfaces.ToDictionary(x => x.Name, x => x);
     }
 
-    public async Task Start()
+    public async Task Initialize()
     {
-        var rootContext = new RootContext(interfaceChains, name);
+        if (initialized)
+        {
+            throw new Exception("The router has already been initialized.");
+        }
 
+        rootContext = new RootContext(interfaceChains, name);
         await routingProtocol.Start(new RouterMetadata(name, interfaces.Keys.ToList())).ConfigureAwait(false);
 
         foreach (var iface in interfaces.Values)
         {
             await iface.Initialize(interfaceChains, rootContext).ConfigureAwait(false);
+        }
+
+        initialized = true;
+    }
+
+    public async Task Start()
+    {
+        if (!initialized)
+        {
+            await Initialize().ConfigureAwait(false);
         }
 
         //Start modules in order
@@ -53,7 +68,8 @@ class RouterImpl : IRouter
         await Task.WhenAll(interfaces.Values.Select(s => s.Stop())).ConfigureAwait(false);
         await routingProtocol.Stop().ConfigureAwait(false);
     }
-    
+
+    bool initialized;
     string name;
     IModule[] modules;
     IRoutingProtocol routingProtocol;
@@ -61,4 +77,5 @@ class RouterImpl : IRouter
     SettingsHolder extensibilitySettings;
     Dictionary<string, Interface> interfaces;
     static ILog log = LogManager.GetLogger<RouterImpl>();
+    RootContext rootContext;
 }

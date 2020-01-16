@@ -8,7 +8,13 @@ namespace NServiceBus.Router
     public interface IRouter
     {
         /// <summary>
-        /// Starts the router.
+        /// Initializes the router.
+        /// </summary>
+        /// <returns></returns>
+        Task Initialize();
+
+        /// <summary>
+        /// Initializes and starts the router.
         /// </summary>
         Task Start();
 

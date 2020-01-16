@@ -1,10 +1,11 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 using NServiceBus;
 using NServiceBus.Router;
 
-class PreroutingToSubscribePreroutingFork : ChainTerminator<PreroutingContext>
+class PreroutingToSubscribePreroutingFork : IRule<PreroutingContext, PreroutingContext>
 {
-    protected override async Task<bool> Terminate(PreroutingContext context)
+    public async Task Invoke(PreroutingContext context, Func<PreroutingContext, Task> next)
     {
         if (context.Intent == MessageIntentEnum.Subscribe
             || context.Intent == MessageIntentEnum.Unsubscribe)
@@ -41,10 +42,10 @@ class PreroutingToSubscribePreroutingFork : ChainTerminator<PreroutingContext>
                     .ConfigureAwait(false);
             }
 
-            return true;
+            context.MarkForwarded();
         }
 
-        return false;
+        await next(context).ConfigureAwait(false);
     }
 
     static string GetReplyToAddress(PreroutingContext message)

@@ -39,23 +39,28 @@ class RouterComponent : IComponentBehavior
 
     class Runner : ComponentRunner
     {
-        IRouter @switch;
+        IRouter router;
 
-        public Runner(IRouter @switch, string name)
+        public Runner(IRouter router, string name)
         {
-            this.@switch = @switch;
+            this.router = router;
             Name = name;
         }
 
         public override Task Start(CancellationToken token)
         {
-            return @switch.Start();
+            return router.Initialize();
+        }
+
+        public override Task ComponentsStarted(CancellationToken token)
+        {
+            return router.Start();
         }
 
         public override Task Stop()
         {
-            return @switch != null 
-                ? @switch.Stop() 
+            return router != null 
+                ? router.Stop() 
                 : Task.CompletedTask;
         }
 
