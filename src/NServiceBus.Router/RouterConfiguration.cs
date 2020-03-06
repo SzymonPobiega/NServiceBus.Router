@@ -43,6 +43,26 @@ namespace NServiceBus.Router
             return ifaceConfig;
         }
 
+        /// <summary>
+        /// Adds a new send-only interface to the router.
+        /// </summary>
+        /// <typeparam name="T">Transport to use for this interface.</typeparam>
+        /// <param name="name">Name of the interface.</param>
+        /// <param name="customization">A callback for customizing the transport settings.</param>
+        public SendOnlyInterfaceConfiguration<T> AddSendOnlyInterface<T>(string name, Action<TransportExtensions<T>> customization)
+            where T : TransportDefinition, new()
+        {
+            var ifaceConfig = new SendOnlyInterfaceConfiguration<T>(name, customization, this);
+            InterfaceFactories.Add(() => CreateSendOnlyInterface(ifaceConfig));
+            return ifaceConfig;
+        }
+
+        Interface CreateSendOnlyInterface<T>(SendOnlyInterfaceConfiguration<T> ifaceConfig)
+            where T : TransportDefinition, new()
+        {
+            return ifaceConfig.Create(Name, typeGenerator, Settings);
+        }
+
         Interface CreateInterface<T>(InterfaceConfiguration<T> ifaceConfig) where T : TransportDefinition, new()
         {
             return ifaceConfig.Create(Name, PoisonQueueName, autoCreateQueues, autoCreateQueuesIdentity, ImmediateRetries, DelayedRetries, CircuitBreakerThreshold, typeGenerator, Settings);
