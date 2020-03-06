@@ -8,8 +8,8 @@ class NativePubSubFeature : IFeature
     {
         routerConfig.AddRule(c => new ForwardPublishNativeRule(), c => EnableNativePubSub(c));
         routerConfig.AddRule(c => new ForwardPublishNullRule(), c => c.Settings.HasExplicitValue("NativePubSubDisabled"));
-        routerConfig.AddRule(c => new ForwardSubscribeNativeRule(c.Endpoint.SubscriptionManager), c => EnableNativePubSub(c));
-        routerConfig.AddRule(c => new ForwardUnsubscribeNativeRule(c.Endpoint.SubscriptionManager), c => EnableNativePubSub(c));
+        routerConfig.AddRule(c => new ForwardSubscribeNativeRule(c.Endpoint.SubscriptionManager), c => EnableNativePubSub(c) && !SendOnly(c));
+        routerConfig.AddRule(c => new ForwardUnsubscribeNativeRule(c.Endpoint.SubscriptionManager), c => EnableNativePubSub(c) && !SendOnly(c));
     }
 
     static bool EnableNativePubSub(IRuleCreationContext context)
@@ -20,6 +20,11 @@ class NativePubSubFeature : IFeature
         }
         var transport = context.Endpoint.Settings.Get<TransportInfrastructure>();
         return transport.OutboundRoutingPolicy.Publishes == OutboundRoutingType.Multicast;
+    }
+
+    static bool SendOnly(IRuleCreationContext context)
+    {
+        return context.Endpoint.Settings.GetOrDefault<bool>("Endpoint.SendOnly");
     }
 
     class ForwardPublishNullRule : ChainTerminator<ForwardPublishContext>
