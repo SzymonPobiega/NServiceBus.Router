@@ -10,13 +10,15 @@
     /// Configures the switch port.
     /// </summary>
     /// <typeparam name="T">Type of transport.</typeparam>
-    public class SendOnlyInterfaceConfiguration<T> : IInterfaceConfiguration
+    public class SendOnlyInterfaceConfiguration<T>
         where T : TransportDefinition, new()
     {
         Action<TransportExtensions<T>> customization;
         string overriddenEndpointName;
 
-        ///<inheritdoc/>
+        /// <summary>
+        /// Interface's extensibility settings.
+        /// </summary>
         public SettingsHolder Settings { get; } = new SettingsHolder();
 
         /// <summary>

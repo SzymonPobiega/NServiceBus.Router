@@ -7,21 +7,10 @@
     using Unicast.Subscriptions.MessageDrivenSubscriptions;
 
     /// <summary>
-    /// Represents an interface configuration,
-    /// </summary>
-    public interface IInterfaceConfiguration
-    {
-        /// <summary>
-        /// Interface's extensibility settings.
-        /// </summary>
-        SettingsHolder Settings { get; }
-    }
-
-    /// <summary>
     /// Configures the switch port.
     /// </summary>
     /// <typeparam name="T">Type of transport.</typeparam>
-    public class InterfaceConfiguration<T> : IInterfaceConfiguration
+    public class InterfaceConfiguration<T>
         where T : TransportDefinition, new()
     {
         Action<TransportExtensions<T>> customization;
@@ -30,7 +19,9 @@
         int? maximumConcurrency;
         string overriddenEndpointName;
 
-        ///<inheritdoc/>
+        /// <summary>
+        /// Interface's extensibility settings.
+        /// </summary>
         public SettingsHolder Settings { get; } = new SettingsHolder();
 
         /// <summary>
