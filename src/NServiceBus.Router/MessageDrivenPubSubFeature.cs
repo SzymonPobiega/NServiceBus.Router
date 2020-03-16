@@ -12,9 +12,9 @@ class MessageDrivenPubSubFeature : IFeature
     {
         routerConfig.AddRule(c => new ForwardPublishStorageDrivenRule(GetSubscriptionStorage(c), c.DistributionPolicy), c => IsEnabled(c));
         routerConfig.AddRule(c => new ForwardPublishNullRule(), c => IsExplicitlyDisabled(c));
-        routerConfig.AddRule(c => new ForwardSubscribeMessageDrivenRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName), c => IsEnabled(c));
-        routerConfig.AddRule(c => new ForwardUnsubscribeMessageDrivenRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName), c => IsEnabled(c));
-        routerConfig.AddRule(c => new StorageDrivenSubscriptionRule(GetSubscriptionStorage(c)), c => IsEnabled(c));
+        routerConfig.AddRule(c => new ForwardSubscribeMessageDrivenRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName), c => IsEnabled(c) && !SendOnly(c));
+        routerConfig.AddRule(c => new ForwardUnsubscribeMessageDrivenRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName), c => IsEnabled(c) && !SendOnly(c));
+        routerConfig.AddRule(c => new StorageDrivenSubscriptionRule(GetSubscriptionStorage(c)), c => IsEnabled(c) && !SendOnly(c));
     }
 
     static ISubscriptionStorage GetSubscriptionStorage(IRuleCreationContext c)
@@ -43,6 +43,11 @@ class MessageDrivenPubSubFeature : IFeature
     {
         return context.Settings.HasExplicitValue(SettingsKey) 
                && false == context.Settings.Get<bool>(SettingsKey);
+    }
+
+    static bool SendOnly(IRuleCreationContext context)
+    {
+        return context.Endpoint.Settings.GetOrDefault<bool>("Endpoint.SendOnly");
     }
 
     class ForwardPublishNullRule : ChainTerminator<ForwardPublishContext>
