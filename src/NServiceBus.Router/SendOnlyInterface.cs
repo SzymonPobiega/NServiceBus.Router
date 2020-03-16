@@ -12,11 +12,11 @@ class SendOnlyInterface<T> : Interface where T : TransportDefinition, new()
     {
         this.ruleCreationContextFactory = ruleCreationContextFactory;
         Name = interfaceName;
-        rawConfig = new SendOnlyRawEndpointConfig<T>(endpointName, ext =>
-        {
-            SetTransportSpecificFlags(ext.GetSettings());
-            transportCustomization?.Invoke(ext);
-        });
+
+        config = RawEndpointConfiguration.CreateSendOnly(endpointName);
+        var transport = config.UseTransport<T>();
+        SetTransportSpecificFlags(transport.GetSettings());
+        transportCustomization?.Invoke(transport);
     }
 
     public string Name { get; }
@@ -28,14 +28,15 @@ class SendOnlyInterface<T> : Interface where T : TransportDefinition, new()
 
     public async Task Initialize(InterfaceChains interfaces, RootContext rootContext)
     {
-        sender = await rawConfig.Create().ConfigureAwait(false);
-        var ruleCreationContext = ruleCreationContextFactory(sender);
+        startable = await RawEndpoint.Create(config).ConfigureAwait(false);
+        config = null;
+        var ruleCreationContext = ruleCreationContextFactory(startable);
         interfaces.InitializeInterface(Name, ruleCreationContext);
     }
 
     public async Task StartReceiving()
     {
-        receiver = await sender.Start().ConfigureAwait(false);
+        receiver = await startable.Start().ConfigureAwait(false);
     }
 
     public async Task StopReceiving()
@@ -59,10 +60,10 @@ class SendOnlyInterface<T> : Interface where T : TransportDefinition, new()
         }
     }
 
+    RawEndpointConfiguration config;
+    IStartableRawEndpoint startable;
     IReceivingRawEndpoint receiver;
-    IStartableRawEndpoint sender;
     IStoppableRawEndpoint stoppable;
 
-    SendOnlyRawEndpointConfig<T> rawConfig;
     Func<IRawEndpoint, IRuleCreationContext> ruleCreationContextFactory;
 }
