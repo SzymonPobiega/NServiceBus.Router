@@ -15,5 +15,14 @@ namespace NServiceBus.Router
         {
             interfaceConfig.Settings.Set("NativePubSubDisabled", true);
         }
+
+        /// <summary>
+        /// Disables native publish/subscribe handling for a given send-only interface.
+        /// </summary>
+        public static void DisableNativePubSub<T>(this SendOnlyInterfaceConfiguration<T> interfaceConfig)
+            where T : TransportDefinition, new()
+        {
+            interfaceConfig.Settings.Set("NativePubSubDisabled", true);
+        }
     }
 }
