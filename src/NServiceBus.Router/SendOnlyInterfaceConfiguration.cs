@@ -85,7 +85,7 @@
         /// </summary>
         public EndpointInstances EndpointInstances { get; } = new EndpointInstances();
 
-        internal Interface Create(string endpointName, RuntimeTypeGenerator typeGenerator, SettingsHolder routerSettings)
+        internal SendOnlyInterface Create(string endpointName, RuntimeTypeGenerator typeGenerator, SettingsHolder routerSettings)
         {
             IRuleCreationContext ContextFactory(IRawEndpoint e)
             {

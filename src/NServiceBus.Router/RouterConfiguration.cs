@@ -53,11 +53,11 @@ namespace NServiceBus.Router
             where T : TransportDefinition, new()
         {
             var ifaceConfig = new SendOnlyInterfaceConfiguration<T>(name, customization, this);
-            InterfaceFactories.Add(() => CreateSendOnlyInterface(ifaceConfig));
+            SendOnlyInterfaceFactories.Add(() => CreateSendOnlyInterface(ifaceConfig));
             return ifaceConfig;
         }
 
-        Interface CreateSendOnlyInterface<T>(SendOnlyInterfaceConfiguration<T> ifaceConfig)
+        SendOnlyInterface CreateSendOnlyInterface<T>(SendOnlyInterfaceConfiguration<T> ifaceConfig)
             where T : TransportDefinition, new()
         {
             return ifaceConfig.Create(Name, typeGenerator, Settings);
@@ -148,6 +148,7 @@ namespace NServiceBus.Router
         bool? autoCreateQueues;
         string autoCreateQueuesIdentity;
         internal List<Func<Interface>> InterfaceFactories = new List<Func<Interface>>();
+        internal List<Func<SendOnlyInterface>> SendOnlyInterfaceFactories = new List<Func<SendOnlyInterface>>();
         internal List<IModule> Modules = new List<IModule>();
         internal HashSet<Type> Features = new HashSet<Type>();
         internal IRoutingProtocol RoutingProtocol;

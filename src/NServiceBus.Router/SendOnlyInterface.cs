@@ -6,7 +6,14 @@ using NServiceBus.Configuration.AdvancedExtensibility;
 using NServiceBus.Raw;
 using NServiceBus.Transport;
 
-class SendOnlyInterface<T> : Interface where T : TransportDefinition, new()
+interface SendOnlyInterface
+{
+    string Name { get; }
+    Task Initialize(InterfaceChains interfaces);
+    Task Stop();
+}
+
+class SendOnlyInterface<T> : SendOnlyInterface where T : TransportDefinition, new()
 {
     public SendOnlyInterface(string endpointName, string interfaceName, Action<TransportExtensions<T>> transportCustomization, Func<IRawEndpoint, IRuleCreationContext> ruleCreationContextFactory)
     {
@@ -26,44 +33,27 @@ class SendOnlyInterface<T> : Interface where T : TransportDefinition, new()
         settings.Set("RabbitMQ.RoutingTopologySupportsDelayedDelivery", true);
     }
 
-    public async Task Initialize(InterfaceChains interfaces, RootContext rootContext)
+    public async Task Initialize(InterfaceChains interfaces)
     {
-        startable = await RawEndpoint.Create(config).ConfigureAwait(false);
+        var startable = await RawEndpoint.Create(config).ConfigureAwait(false);
         config = null;
         var ruleCreationContext = ruleCreationContextFactory(startable);
         interfaces.InitializeInterface(Name, ruleCreationContext);
-    }
 
-    public async Task StartReceiving()
-    {
-        receiver = await startable.Start().ConfigureAwait(false);
-    }
-
-    public async Task StopReceiving()
-    {
-        if (receiver != null)
-        {
-            stoppable = await receiver.StopReceiving().ConfigureAwait(false);
-        }
-        else
-        {
-            stoppable = null;
-        }
+        endpoint = await startable.Start().ConfigureAwait(false);
     }
 
     public async Task Stop()
     {
-        if (stoppable != null)
+        if (endpoint != null)
         {
-            await stoppable.Stop().ConfigureAwait(false);
-            stoppable = null;
+            await endpoint.Stop().ConfigureAwait(false);
+            endpoint = null;
         }
     }
 
     RawEndpointConfiguration config;
-    IStartableRawEndpoint startable;
-    IReceivingRawEndpoint receiver;
-    IStoppableRawEndpoint stoppable;
+    IStoppableRawEndpoint endpoint;
 
     Func<IRawEndpoint, IRuleCreationContext> ruleCreationContextFactory;
 }

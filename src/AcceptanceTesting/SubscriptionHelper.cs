@@ -8,4 +8,10 @@ public static class SubscriptionHelper
         interfaceConfig.EnableMessageDrivenPublishSubscribe(new InMemorySubscriptionStorage());
         return interfaceConfig;
     }
+
+    public static SendOnlyInterfaceConfiguration<T> InMemorySubscriptions<T>(this SendOnlyInterfaceConfiguration<T> interfaceConfig) where T : TransportDefinition, new()
+    {
+        interfaceConfig.EnableMessageDrivenPublishSubscribe(new InMemorySubscriptionStorage());
+        return interfaceConfig;
+    }
 }

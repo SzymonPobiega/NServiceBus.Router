@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using NServiceBus.Logging;
@@ -7,14 +6,15 @@ using NServiceBus.Router;
 
 class RouterImpl : IRouter
 {
-    public RouterImpl(string name, Interface[] interfaces, IModule[] modules, IRoutingProtocol routingProtocol, InterfaceChains interfaceChains, SettingsHolder extensibilitySettings)
+    public RouterImpl(string name, Interface[] interfaces, SendOnlyInterface[] sendOnlyInterfaces, IModule[] modules, IRoutingProtocol routingProtocol, InterfaceChains interfaceChains, SettingsHolder extensibilitySettings)
     {
         this.name = name;
+        this.sendOnlyInterfaces = sendOnlyInterfaces;
         this.modules = modules;
         this.routingProtocol = routingProtocol;
         this.interfaceChains = interfaceChains;
         this.extensibilitySettings = extensibilitySettings;
-        this.interfaces = interfaces.ToDictionary(x => x.Name, x => x);
+        this.interfaces = interfaces;
     }
 
     public async Task Initialize()
@@ -25,9 +25,14 @@ class RouterImpl : IRouter
         }
 
         rootContext = new RootContext(interfaceChains, name);
-        await routingProtocol.Start(new RouterMetadata(name, interfaces.Keys.ToList())).ConfigureAwait(false);
+        await routingProtocol.Start(new RouterMetadata(name, interfaces.Select(i => i.Name).ToList())).ConfigureAwait(false);
 
-        foreach (var iface in interfaces.Values)
+        foreach (var iface in sendOnlyInterfaces)
+        {
+            await iface.Initialize(interfaceChains).ConfigureAwait(false);
+        }
+
+        foreach (var iface in interfaces)
         {
             await iface.Initialize(interfaceChains, rootContext).ConfigureAwait(false);
         }
@@ -50,12 +55,12 @@ class RouterImpl : IRouter
             log.Debug($"Started module {module}");
         }
 
-        await Task.WhenAll(interfaces.Values.Select(p => p.StartReceiving())).ConfigureAwait(false);
+        await Task.WhenAll(interfaces.Select(p => p.StartReceiving())).ConfigureAwait(false);
     }
 
     public async Task Stop()
     {
-        await Task.WhenAll(interfaces.Values.Select(s => s.StopReceiving())).ConfigureAwait(false);
+        await Task.WhenAll(interfaces.Select(s => s.StopReceiving())).ConfigureAwait(false);
 
         //Stop modules in reverse order
         foreach (var module in modules.Reverse())
@@ -65,17 +70,19 @@ class RouterImpl : IRouter
             log.Debug($"Stopped module {module}");
         }
 
-        await Task.WhenAll(interfaces.Values.Select(s => s.Stop())).ConfigureAwait(false);
+        await Task.WhenAll(interfaces.Select(s => s.Stop())).ConfigureAwait(false);
+        await Task.WhenAll(sendOnlyInterfaces.Select(s => s.Stop())).ConfigureAwait(false);
         await routingProtocol.Stop().ConfigureAwait(false);
     }
 
     bool initialized;
     string name;
+    Interface[] interfaces;
+    SendOnlyInterface[] sendOnlyInterfaces;
     IModule[] modules;
     IRoutingProtocol routingProtocol;
     InterfaceChains interfaceChains;
     SettingsHolder extensibilitySettings;
-    Dictionary<string, Interface> interfaces;
     static ILog log = LogManager.GetLogger<RouterImpl>();
     RootContext rootContext;
 }

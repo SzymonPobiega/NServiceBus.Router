@@ -28,7 +28,9 @@ namespace NServiceBus.Router
                 feature.Configure(config);
             }
 
+            var sendOnlyInterfaces = config.SendOnlyInterfaceFactories.Select(x => x()).ToArray();
             var interfaces = config.InterfaceFactories.Select(x => x()).ToArray();
+            var allInterfaceNames = sendOnlyInterfaces.Select(i => i.Name).Concat(interfaces.Select(i => i.Name)).ToArray();
 
             var chains = config.Chains;
 
@@ -61,7 +63,7 @@ namespace NServiceBus.Router
 
             chains.AddRule(_ => new PreroutingToPublishPreroutingFork());
             chains.AddChain(cb => cb.Begin<PublishPreroutingContext>().Terminate());
-            chains.AddRule(c => new PublishPreroutingTerminator(interfaces.Select(i => i.Name).ToArray(), c.TypeGenerator));
+            chains.AddRule(c => new PublishPreroutingTerminator(allInterfaceNames, c.TypeGenerator));
             chains.AddChain(cb => cb.Begin<ForwardPublishContext>().Terminate());
 
             chains.AddRule(_ => new PreroutingToReplyPreroutingFork());
@@ -80,7 +82,7 @@ namespace NServiceBus.Router
             chains.AddChain(cb => cb.Begin<PostroutingContext>().Terminate());
             chains.AddRule(c => new PostroutingTerminator(c.Endpoint));
 
-            return new RouterImpl(config.Name, interfaces, config.Modules.ToArray(), config.RoutingProtocol, chains, config.Settings);
+            return new RouterImpl(config.Name, interfaces, sendOnlyInterfaces, config.Modules.ToArray(), config.RoutingProtocol, chains, config.Settings);
         }
     }
 }
