@@ -24,7 +24,7 @@ namespace NServiceBus.Router
 
             var parts = messageType.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries);
             var nameAndNamespace = parts[0];
-            var assembly = parts[1];
+            var assembly = parts.Length > 1 ? parts[1] : unknownAssemblyName;
 
             ModuleBuilder moduleBuilder;
             lock (assemblies)
@@ -90,6 +90,7 @@ namespace NServiceBus.Router
         Dictionary<string, ModuleBuilder> assemblies = new Dictionary<string, ModuleBuilder>();
         Dictionary<string, Type> types = new Dictionary<string, Type>();
         Dictionary<string, TypeBuilder> typeBuilders = new Dictionary<string, TypeBuilder>();
+        const string unknownAssemblyName = "NServiceBus.Router.UnknownAssembly";
     }
 
 }

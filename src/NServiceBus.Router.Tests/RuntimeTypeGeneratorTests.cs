@@ -15,6 +15,16 @@ public class RuntimeTypeGeneratorTests
     }
 
     [Test]
+    public void Can_create_dynamic_type_when_assembly_is_not_specified()
+    {
+        var router = new RuntimeTypeGenerator();
+        var type = router.GetType("MyNamespace.MyType");
+
+        Assert.AreEqual("NServiceBus.Router.UnknownAssembly", type.Assembly.GetName().Name);
+        Assert.AreEqual("MyNamespace.MyType, NServiceBus.Router.UnknownAssembly, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null", type.AssemblyQualifiedName);
+    }
+
+    [Test]
     public void Can_create_dynamic_type_for_a_nested_type()
     {
         var router = new RuntimeTypeGenerator();
