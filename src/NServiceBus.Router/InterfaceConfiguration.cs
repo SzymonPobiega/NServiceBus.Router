@@ -42,7 +42,7 @@
         }
 
         /// <summary>
-        /// Adds a global (applicable to all interfaces) routing rule.
+        /// Adds routing rule that applies only to this interface.
         /// </summary>
         /// <typeparam name="TRule">Type of the rule.</typeparam>
         /// <param name="constructor">Delegate that constructs a new instance of the rule.</param>
