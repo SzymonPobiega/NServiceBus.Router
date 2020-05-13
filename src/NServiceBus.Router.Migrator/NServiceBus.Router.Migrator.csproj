@@ -10,8 +10,8 @@
 
   <ItemGroup>
     <PackageReference Include="MinVer" Version="1.0.0-*" PrivateAssets="All" />
-    <PackageReference Include="NServiceBus" Version="[7.0.0, 8.0.0)" />
-    <PackageReference Include="NServiceBus.Raw" Version="[3.0.2, 4.0.0)" />
+    <PackageReference Include="NServiceBus" Version="[7.3.0, 8.0.0)" />
+    <PackageReference Include="NServiceBus.Raw" Version="[3.2.0, 4.0.0)" />
   </ItemGroup>
 
   <ItemGroup>

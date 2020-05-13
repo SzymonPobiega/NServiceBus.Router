@@ -10,7 +10,7 @@
     <ProjectReference Include="..\NServiceBus.Router.Connector\NServiceBus.Router.Connector.csproj" />
     <ProjectReference Include="..\LoadTests.Shared\LoadTests.Shared.csproj" />
 
-    <PackageReference Include="NServiceBus" Version="[7.0.0, 8.0.0)" />
+    <PackageReference Include="NServiceBus" Version="[7.3.0, 8.0.0)" />
     <PackageReference Include="NServiceBus.SqlServer" Version="[4.1.0, 5.0.0)" />
     <PackageReference Include="NServiceBus.Newtonsoft.Json" Version="[2.0.0, 3.0.0)" />
     <PackageReference Include="Metrics.NET" Version="0.5.5" />
