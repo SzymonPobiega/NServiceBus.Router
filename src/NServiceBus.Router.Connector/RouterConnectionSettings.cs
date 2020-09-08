@@ -43,21 +43,8 @@ namespace NServiceBus
             PublisherTable[eventType] = publisherEndpointName;
         }
 
-        /// <summary>
-        /// Associate selected destination sites with this router connection
-        /// </summary>
-        /// <param name="sites"></param>
-        public void AssociateSites(params string[] sites)
-        {
-            foreach (var site in sites)
-            {
-                AssociatedSites.Add(site);
-            }
-        }
-
         internal string RouterAddress;
         internal Dictionary<Type, string> SendRouteTable = new Dictionary<Type, string>();
         internal Dictionary<Type, string> PublisherTable = new Dictionary<Type, string>();
-        internal HashSet<string> AssociatedSites = new HashSet<string>();
     }
 }
