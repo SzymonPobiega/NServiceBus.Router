@@ -27,7 +27,7 @@ class RouterConnectionFeature : Feature
             unicastRouteTable.AddOrReplaceRoutes("NServiceBus.Router_"+connection.RouterAddress, routes);
         }
 
-        context.Pipeline.Register(new ForwardSiteMessagesToRouterBehavior(compiledSettings), "Routes messages sent to sites to the bridge.");
+        context.Pipeline.Register(new ForwardSiteMessagesToRouterBehavior(), "Routes messages sent to sites to the bridge.");
         context.Pipeline.Register(new RoutingHeadersBehavior(compiledSettings), "Sets the ultimate destination endpoint on the outgoing messages.");
         context.Pipeline.Register(new CorrelationIdForReplyBehavior(), "Copy previous correlation ID for reply");
 

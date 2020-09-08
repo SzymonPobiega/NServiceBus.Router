@@ -34,16 +34,6 @@ class CompiledRouterConnectionSettings
                 }
                 commandRouting[receiverEntry.Key] = new DestinationInfo(receiverEntry.Value, router.RouterAddress);
             }
-
-            foreach (var site in router.AssociatedSites)
-            {
-                if (siteRouting.TryGetValue(site, out var siteInfo))
-                {
-                    throw new Exception($"Site {site} is already associated with router {siteInfo}.");
-                }
-
-                siteRouting[site] = router.RouterAddress;
-            }
         }
     }
 
@@ -55,15 +45,5 @@ class CompiledRouterConnectionSettings
     public bool TryGetDestination(Type eventType, out DestinationInfo destinationInfo)
     {
         return commandRouting.TryGetValue(eventType, out destinationInfo);
-    }
-
-    public string GetRouterForSite(string siteName)
-    {
-        if (siteRouting.TryGetValue(siteName, out var router))
-        {
-            return router;
-        }
-
-        return defaultRouter;
     }
 }
