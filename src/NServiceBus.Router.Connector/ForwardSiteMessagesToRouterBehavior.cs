@@ -9,11 +9,11 @@ namespace NServiceBus
 
     class ForwardSiteMessagesToRouterBehavior : Behavior<IRoutingContext>
     {
-        string routerAddress;
+        readonly CompiledRouterConnectionSettings compiledSettings;
 
-        public ForwardSiteMessagesToRouterBehavior(string routerAddress)
+        public ForwardSiteMessagesToRouterBehavior(CompiledRouterConnectionSettings compiledSettings)
         {
-            this.routerAddress = routerAddress;
+            this.compiledSettings = compiledSettings;
         }
 
         public override Task Invoke(IRoutingContext context, Func<Task> next)
@@ -27,9 +27,17 @@ namespace NServiceBus
                 throw new Exception("Site name cannot contain a semicolon.");
             }
 
-            var newRoutingStrategies = context.RoutingStrategies.Select(s => (RoutingStrategy)new SiteRoutingStrategy(routerAddress, state.Sites));
+            var newRoutingStrategies = context.RoutingStrategies
+                .SelectMany(s => CreateSiteRoutingStrategies(s, state));
             context.RoutingStrategies = newRoutingStrategies.ToArray();
             return next();
+        }
+
+        IEnumerable<RoutingStrategy> CreateSiteRoutingStrategies(RoutingStrategy routingStrategy, State state)
+        {
+            var map = state.Sites.ToDictionary(x => x, x => compiledSettings.GetRouterForSite(x));
+            var lookup = map.ToLookup(x => x.Value, x => x.Key);
+            return lookup.Select(x => new SiteRoutingStrategy(x.Key, x.ToArray()));
         }
 
         public class State

@@ -15,11 +15,17 @@ namespace NServiceBus
         /// <param name="routerAddress">Transport address of router's interface.</param>
         public static RouterConnectionSettings ConnectToRouter(this RoutingSettings routingSettings, string routerAddress)
         {
-            routingSettings.GetSettings().EnableFeatureByDefault(typeof(RouterConnectionFeature));
+            var settingsHolder = routingSettings.GetSettings();
 
-            var settings = new RouterConnectionSettings(routerAddress);
-            routingSettings.GetSettings().Set<RouterConnectionSettings>(settings);
-            return settings;
+            settingsHolder.EnableFeatureByDefault(typeof(RouterConnectionFeature));
+
+            if (!settingsHolder.TryGet(out RouterConnectionSettingsCollection connectionSettings))
+            {
+                connectionSettings = new RouterConnectionSettingsCollection();
+                settingsHolder.Set<RouterConnectionSettingsCollection>(connectionSettings);
+            }
+
+            return connectionSettings.GetOrCreate(routerAddress);
         }
     }
 }

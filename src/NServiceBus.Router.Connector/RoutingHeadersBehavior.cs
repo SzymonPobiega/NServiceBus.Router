@@ -1,22 +1,21 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using NServiceBus.Pipeline;
 
 class RoutingHeadersBehavior : Behavior<IOutgoingSendContext>
 {
-    Dictionary<Type, string> routeTable;
+    readonly CompiledRouterConnectionSettings compiledSettings;
 
-    public RoutingHeadersBehavior(Dictionary<Type, string> routeTable)
+    public RoutingHeadersBehavior(CompiledRouterConnectionSettings compiledSettings)
     {
-        this.routeTable = routeTable;
+        this.compiledSettings = compiledSettings;
     }
 
     public override Task Invoke(IOutgoingSendContext context, Func<Task> next)
     {
-        if (routeTable.TryGetValue(context.Message.MessageType, out var ultimateDestination) && ultimateDestination != null)
+        if (compiledSettings.TryGetDestination(context.Message.MessageType, out var ultimateDestination))
         {
-            context.Headers["NServiceBus.Bridge.DestinationEndpoint"] = ultimateDestination;
+            context.Headers["NServiceBus.Bridge.DestinationEndpoint"] = ultimateDestination.Endpoint;
         }
         return next();
     }

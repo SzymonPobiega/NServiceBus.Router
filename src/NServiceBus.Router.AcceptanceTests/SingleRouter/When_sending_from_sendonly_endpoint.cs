@@ -72,7 +72,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 public Task Handle(MyMessage message, IMessageHandlerContext context)
                 {
                     scenarioContext.MessageReceived = true;
-                    return context.Reply(new MyResponse());
+                    return Task.CompletedTask;
                 }
             }
         }
