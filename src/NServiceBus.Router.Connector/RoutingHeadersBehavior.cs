@@ -13,7 +13,8 @@ class RoutingHeadersBehavior : Behavior<IOutgoingSendContext>
 
     public override Task Invoke(IOutgoingSendContext context, Func<Task> next)
     {
-        if (compiledSettings.TryGetDestination(context.Message.MessageType, out var ultimateDestination))
+        if (compiledSettings.TryGetDestination(context.Message.MessageType, out var ultimateDestination)
+            && ultimateDestination.Endpoint != null) //null value if DelegateRouting was used
         {
             context.Headers["NServiceBus.Bridge.DestinationEndpoint"] = ultimateDestination.Endpoint;
         }
