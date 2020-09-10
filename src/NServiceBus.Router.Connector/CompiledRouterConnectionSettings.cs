@@ -5,7 +5,6 @@ class CompiledRouterConnectionSettings
 {
     Dictionary<Type, DestinationInfo> eventRouting = new Dictionary<Type, DestinationInfo>();
     Dictionary<Type, DestinationInfo> commandRouting = new Dictionary<Type, DestinationInfo>();
-    Dictionary<string, string> siteRouting = new Dictionary<string, string>();
     string defaultRouter;
 
     public CompiledRouterConnectionSettings(RouterConnectionSettingsCollection collection)
