@@ -22,7 +22,7 @@ class RouterConnectionFeature : Feature
             bindings.BindSending(connection.RouterAddress);
 
             //Send the specified messages through the router
-            var route = UnicastRoute.CreateFromEndpointName(connection.RouterAddress);
+            var route = UnicastRoute.CreateFromPhysicalAddress(connection.RouterAddress);
             var routes = connection.SendRouteTable.Select(x => new RouteTableEntry(x.Key, route)).ToList();
             unicastRouteTable.AddOrReplaceRoutes("NServiceBus.Router_"+connection.RouterAddress, routes);
         }

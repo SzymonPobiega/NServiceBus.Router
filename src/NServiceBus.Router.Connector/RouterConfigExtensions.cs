@@ -22,7 +22,7 @@ namespace NServiceBus
             if (!settingsHolder.TryGet(out RouterConnectionSettingsCollection connectionSettings))
             {
                 connectionSettings = new RouterConnectionSettingsCollection();
-                settingsHolder.Set<RouterConnectionSettingsCollection>(connectionSettings);
+                settingsHolder.Set(connectionSettings);
             }
 
             return connectionSettings.GetOrCreate(routerAddress);
