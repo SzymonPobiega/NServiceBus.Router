@@ -29,9 +29,6 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                         var connString = Environment.GetEnvironmentVariable("AzureServiceBus.ConnectionString");
                         t.ConnectionString(connString);
                         t.UseForwardingTopology();
-                        var settings = t.GetSettings();
-                        var serializer = Tuple.Create(new NewtonsoftSerializer() as SerializationDefinition, new SettingsHolder());
-                        settings.Set("MainSerializer", serializer);
                     });
                     cfg.CircuitBreakerThreshold = int.MaxValue;
                     cfg.DelayedRetries = 0;

@@ -5,15 +5,12 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
     using System.Threading.Tasks;
     using System.Transactions;
     using AcceptanceTesting;
-    using Configuration.AdvancedExtensibility;
     using Events;
     using Features;
     using NServiceBus;
     using NServiceBus.AcceptanceTests;
     using NServiceBus.AcceptanceTests.EndpointTemplates;
     using NUnit.Framework;
-    using Serialization;
-    using Settings;
     using Conventions = AcceptanceTesting.Customization.Conventions;
 
     [TestFixture]
@@ -56,18 +53,10 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 var connString = Environment.GetEnvironmentVariable("AzureServiceBus.ConnectionString");
                 t.ConnectionString(connString);
-                var settings = t.GetSettings();
-
-                var builder = new ConventionsBuilder(settings);
-                builder.DefiningEventsAs(EventConvention);
-                settings.Set(builder.Conventions);
 
                 var topology = t.UseEndpointOrientedTopology();
                 topology.EnableMigrationToForwardingTopology();
                 topology.RegisterPublisher(typeof(MyAsbEvent), Conventions.EndpointNamingConvention(typeof(Publisher)));
-
-                var serializer = Tuple.Create(new NewtonsoftSerializer() as SerializationDefinition, new SettingsHolder());
-                settings.Set("MainSerializer", serializer);
             });
             leftIface.LimitMessageProcessingConcurrencyTo(1); //To ensure when tracer arrives the subscribe request has already been processed.;
             cfg.AddRule(_ => new SuppressTransactionScopeRule());

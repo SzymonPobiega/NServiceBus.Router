@@ -38,9 +38,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NServiceBus.Router.Migrator
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "MigratorSample", "MigratorSample", "{463FEF84-A047-45F2-AB9D-6E3AA36518B5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Client", "Client\Client.csproj", "{83AAE3E1-FE94-4E01-A649-99A2B5938D29}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Client", "Client\Client.csproj", "{83AAE3E1-FE94-4E01-A649-99A2B5938D29}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared", "Shared\Shared.csproj", "{58F8E14B-E6F5-4FCD-8BD8-41651F885518}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Shared", "Shared\Shared.csproj", "{58F8E14B-E6F5-4FCD-8BD8-41651F885518}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Billing", "Billing\Billing.csproj", "{093B790B-D506-4F10-9FD7-9084D9F1200A}"
 EndProject

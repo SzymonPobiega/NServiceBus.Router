@@ -31,18 +31,10 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                     {
                         var connString = Environment.GetEnvironmentVariable("AzureServiceBus.ConnectionString");
                         t.ConnectionString(connString);
-                        var settings = t.GetSettings();
                         t.Transactions(TransportTransactionMode.ReceiveOnly);
-
-                        var builder = new ConventionsBuilder(settings);
-                        builder.DefiningEventsAs(EventConvention);
-                        settings.Set(builder.Conventions);
 
                         t.UseForwardingTopology();
                         t.Sanitization().UseStrategy<ValidateAndHashIfNeeded>();
-
-                        var serializer = Tuple.Create(new NewtonsoftSerializer() as SerializationDefinition, new SettingsHolder());
-                        settings.Set("MainSerializer", serializer);
                     });
                     leftIface.LimitMessageProcessingConcurrencyTo(1); //To ensure when tracer arrives the subscribe request has already been processed.;
                     cfg.UseStaticRoutingProtocol().AddForwardRoute("Right", "Left");

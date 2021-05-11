@@ -1,11 +1,14 @@
 ﻿using System;
+using System.Reflection;
 using System.Threading.Tasks;
 using NServiceBus;
 using NServiceBus.Router;
 using NServiceBus.Configuration.AdvancedExtensibility;
 using NServiceBus.Logging;
 using NServiceBus.Raw;
+using NServiceBus.Serialization;
 using NServiceBus.Transport;
+using NServiceBus.Unicast.Messages;
 
 interface Interface
 {
@@ -25,7 +28,6 @@ class Interface<T> : Interface where T : TransportDefinition, new()
         Name = interfaceName;
         rawConfig = new ThrottlingRawEndpointConfig<T>(endpointName, poisonQueue, ext =>
             {
-                SetTransportSpecificFlags(ext.GetSettings(), poisonQueue);
                 transportCustomization?.Invoke(ext);
             },
             (context, _) => preroutingChain.Invoke(new RawContext(context, Name, rootContext)),
@@ -36,12 +38,6 @@ class Interface<T> : Interface where T : TransportDefinition, new()
             },
             maximumConcurrency,
             immediateRetries, delayedRetries, circuitBreakerThreshold, autoCreateQueues, autoCreateQueuesIdentity);
-    }
-
-    static void SetTransportSpecificFlags(NServiceBus.Settings.SettingsHolder settings, string poisonQueue)
-    {
-        settings.Set("errorQueue", poisonQueue);
-        settings.Set("RabbitMQ.RoutingTopologySupportsDelayedDelivery", true);
     }
 
     public async Task Initialize(InterfaceChains interfaces, RootContext rootContext)
