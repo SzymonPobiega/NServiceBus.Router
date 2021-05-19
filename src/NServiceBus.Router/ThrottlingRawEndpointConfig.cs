@@ -16,7 +16,8 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
     where T : TransportDefinition, new()
 {
     public ThrottlingRawEndpointConfig(string queue, string poisonMessageQueueName, Action<TransportExtensions<T>> transportCustomization, 
-        Func<MessageContext, IDispatchMessages, Task> onMessage, PoisonMessageHandling poisonMessageHandling, 
+        Func<MessageContext, IDispatchMessages, Task> onMessage, PoisonMessageHandling poisonMessageHandling,
+        Action<IErrorHandlingPolicyContext> onFailure,
         int? maximumConcurrency, int immediateRetries, int delayedRetries, int circuitBreakerThreshold, bool autoCreateQueue, string autoCreateQueueIdentity = null)
     {
         if (immediateRetries < 0)
@@ -31,11 +32,11 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
         {
             throw new ArgumentException("Circuit breaker threshold must not be less than zero.", nameof(circuitBreakerThreshold));
         }
-        config = PrepareConfig(queue, poisonMessageQueueName, transportCustomization, onMessage, poisonMessageHandling, maximumConcurrency, immediateRetries, delayedRetries, circuitBreakerThreshold, autoCreateQueue, autoCreateQueueIdentity);
+        config = PrepareConfig(queue, poisonMessageQueueName, transportCustomization, onMessage, poisonMessageHandling, onFailure, maximumConcurrency, immediateRetries, delayedRetries, circuitBreakerThreshold, autoCreateQueue, autoCreateQueueIdentity);
     }
 
-    RawEndpointConfiguration PrepareConfig(string inputQueue, string poisonMessageQueueName, Action<TransportExtensions<T>> transportCustomization, 
-        Func<MessageContext, IDispatchMessages, Task> onMessage, PoisonMessageHandling poisonMessageHandling, int? maximumConcurrency, 
+    RawEndpointConfiguration PrepareConfig(string inputQueue, string poisonMessageQueueName, Action<TransportExtensions<T>> transportCustomization,
+        Func<MessageContext, IDispatchMessages, Task> onMessage, PoisonMessageHandling poisonMessageHandling, Action<IErrorHandlingPolicyContext> onFailure, int? maximumConcurrency,
         int immediateRetries, int delayedRetries, int circuitBreakerThreshold, bool autoCreateQueue, string autoCreateQueueIdentity)
     {
         var circuitBreaker = new RepeatedFailuresCircuitBreaker(inputQueue, circuitBreakerThreshold, e =>
@@ -47,7 +48,7 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
                 try
                 {
                     var oldEndpoint = endpoint;
-                    var throttledConfig = PrepareThrottledConfig(inputQueue, poisonMessageQueueName, transportCustomization, onMessage, poisonMessageHandling, maximumConcurrency, immediateRetries, circuitBreakerThreshold, delayedRetries);
+                    var throttledConfig = PrepareThrottledConfig(inputQueue, poisonMessageQueueName, transportCustomization, onMessage, poisonMessageHandling, onFailure, maximumConcurrency, immediateRetries, circuitBreakerThreshold, delayedRetries);
                     var newEndpoint = await RawEndpoint.Start(throttledConfig).ConfigureAwait(false);
                     endpoint = newEndpoint;
                     await oldEndpoint.Stop().ConfigureAwait(false);
@@ -67,7 +68,7 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
             await onMessage(context, dispatcher).ConfigureAwait(false);
             circuitBreaker.Success();
         }, poisonMessageQueueName);
-        regularConfig.CustomErrorHandlingPolicy(new RegularModePolicy(inputQueue, circuitBreaker, poisonMessageHandling, immediateRetries, delayedRetries));
+        regularConfig.CustomErrorHandlingPolicy(new RegularModePolicy(inputQueue, circuitBreaker, poisonMessageHandling, immediateRetries, delayedRetries, onFailure));
         var transport = regularConfig.UseTransport<T>();
         transportCustomization(transport);
         if (autoCreateQueue)
@@ -82,7 +83,7 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
     }
 
     RawEndpointConfiguration PrepareThrottledConfig(string inputQueue, string poisonMessageQueueName, Action<TransportExtensions<T>> transportCustomization, 
-        Func<MessageContext, IDispatchMessages, Task> onMessage, PoisonMessageHandling poisonMessageHandling, int? maximumConcurrency, 
+        Func<MessageContext, IDispatchMessages, Task> onMessage, PoisonMessageHandling poisonMessageHandling, Action<IErrorHandlingPolicyContext> onFailure, int? maximumConcurrency, 
         int immediateRetries, int delayedRetries, int circuitBreakerThreshold)
     {
         var switchedBack = false;
@@ -100,7 +101,7 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
                 try
                 {
                     var oldEndpoint = endpoint;
-                    var regularConfig = PrepareConfig(inputQueue, poisonMessageQueueName, transportCustomization, onMessage, poisonMessageHandling, maximumConcurrency, immediateRetries, delayedRetries, circuitBreakerThreshold, false, null);
+                    var regularConfig = PrepareConfig(inputQueue, poisonMessageQueueName, transportCustomization, onMessage, poisonMessageHandling, onFailure, maximumConcurrency, immediateRetries, delayedRetries, circuitBreakerThreshold, false, null);
                     var newEndpoint = await RawEndpoint.Start(regularConfig).ConfigureAwait(false);
                     endpoint = newEndpoint;
                     await oldEndpoint.Stop().ConfigureAwait(false);
@@ -117,7 +118,7 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
             switchedBack = true;
         }, poisonMessageQueueName);
 
-        throttledConfig.CustomErrorHandlingPolicy(new ThrottledModePolicy(inputQueue, immediateRetries));
+        throttledConfig.CustomErrorHandlingPolicy(new ThrottledModePolicy(inputQueue, immediateRetries, onFailure));
         var transport = throttledConfig.UseTransport<T>();
         transportCustomization(transport);
         throttledConfig.LimitMessageProcessingConcurrencyTo(1);
@@ -186,18 +187,21 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
         PoisonMessageHandling poisonMessageHandling;
         int immediateRetries;
         int delayedRetries;
+        Action<IErrorHandlingPolicyContext> onFailure;
 
-        public RegularModePolicy(string inputQueue, RepeatedFailuresCircuitBreaker circuitBreaker, PoisonMessageHandling poisonMessageHandling, int immediateRetries, int delayedRetries)
+        public RegularModePolicy(string inputQueue, RepeatedFailuresCircuitBreaker circuitBreaker, PoisonMessageHandling poisonMessageHandling, int immediateRetries, int delayedRetries, Action<IErrorHandlingPolicyContext> onFailure)
         {
             this.circuitBreaker = circuitBreaker;
             this.inputQueue = inputQueue;
             this.poisonMessageHandling = poisonMessageHandling;
             this.immediateRetries = immediateRetries;
             this.delayedRetries = delayedRetries;
+            this.onFailure = onFailure;
         }
 
         public async Task<ErrorHandleResult> OnError(IErrorHandlingPolicyContext handlingContext, IDispatchMessages dispatcher)
         {
+            onFailure(handlingContext);
             if (handlingContext.Error.Exception is UnforwardableMessageException)
             {
                 //UnforwardableMessageException immediately triggers poison queue
@@ -241,15 +245,18 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
     {
         string inputQueue;
         int immediateRetries;
+        Action<IErrorHandlingPolicyContext> onFailure;
 
-        public ThrottledModePolicy(string inputQueue, int immediateRetries)
+        public ThrottledModePolicy(string inputQueue, int immediateRetries, Action<IErrorHandlingPolicyContext> onFailure)
         {
             this.inputQueue = inputQueue;
             this.immediateRetries = immediateRetries;
+            this.onFailure = onFailure;
         }
 
         public async Task<ErrorHandleResult> OnError(IErrorHandlingPolicyContext handlingContext, IDispatchMessages dispatcher)
         {
+            onFailure(handlingContext);
             await Task.Delay(1000);
             if (handlingContext.Error.ImmediateProcessingFailures < immediateRetries)
             {

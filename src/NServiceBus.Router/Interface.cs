@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using NServiceBus;
 using NServiceBus.Router;
@@ -28,11 +29,22 @@ class Interface<T> : Interface where T : TransportDefinition, new()
                 SetTransportSpecificFlags(ext.GetSettings(), poisonQueue);
                 transportCustomization?.Invoke(ext);
             },
-            (context, _) => preroutingChain.Invoke(new RawContext(context, Name, rootContext)),
+            async (context, _) =>
+            {
+                var watch = new Stopwatch();
+                watch.Start();
+                await preroutingChain.Invoke(new RawContext(context, Name, rootContext));
+                watch.Stop();
+                RouterEventSource.Instance.MessageProcessed(endpointName, interfaceName, watch.ElapsedMilliseconds);
+            },
             (context, dispatcher) =>
             {
                 log.Error("Moving poison message to the error queue", context.Error.Exception);
                 return context.MoveToErrorQueue(poisonQueue);
+            },
+            context =>
+            {
+                RouterEventSource.Instance.MessageFailed(endpointName, interfaceName);
             },
             maximumConcurrency,
             immediateRetries, delayedRetries, circuitBreakerThreshold, autoCreateQueues, autoCreateQueuesIdentity);
