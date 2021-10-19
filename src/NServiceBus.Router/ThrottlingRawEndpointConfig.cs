@@ -68,6 +68,15 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
             circuitBreaker.Success();
         }, poisonMessageQueueName);
         regularConfig.CustomErrorHandlingPolicy(new RegularModePolicy(inputQueue, circuitBreaker, poisonMessageHandling, immediateRetries, delayedRetries));
+
+        Task onCriticalError(ICriticalErrorContext context)
+        {
+            logger.Fatal($"The receiver for queue {inputQueue} has encountered a severe error that is likely related to the connectivity with the broker or the broker itself.");
+            return Task.CompletedTask;
+        }
+
+        regularConfig.Settings.Set("onCriticalErrorAction", (Func<ICriticalErrorContext, Task>)onCriticalError);
+
         var transport = regularConfig.UseTransport<T>();
         transportCustomization(transport);
         if (autoCreateQueue)
@@ -118,6 +127,15 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
         }, poisonMessageQueueName);
 
         throttledConfig.CustomErrorHandlingPolicy(new ThrottledModePolicy(inputQueue, immediateRetries));
+
+        Task onCriticalError(ICriticalErrorContext context)
+        {
+            logger.Fatal($"The receiver for queue {inputQueue} has encountered a severe error that is likely related to the connectivity with the broker or the broker itself.");
+            return Task.CompletedTask;
+        }
+
+        throttledConfig.Settings.Set("onCriticalErrorAction", (Func<ICriticalErrorContext, Task>)onCriticalError);
+
         var transport = throttledConfig.UseTransport<T>();
         transportCustomization(transport);
         throttledConfig.LimitMessageProcessingConcurrencyTo(1);
