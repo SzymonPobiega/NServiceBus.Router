@@ -3,6 +3,7 @@ using NServiceBus;
 using NServiceBus.Features;
 using NServiceBus.Routing;
 using NServiceBus.Transport;
+using NServiceBus.Unicast.Subscriptions.MessageDrivenSubscriptions;
 
 class RouterConnectionFeature : Feature
 {
@@ -26,6 +27,15 @@ class RouterConnectionFeature : Feature
             var routes = connection.SendRouteTable.Select(x => new RouteTableEntry(x.Key, route)).ToList();
             unicastRouteTable.AddOrReplaceRoutes("NServiceBus.Router_"+connection.RouterAddress, routes);
         }
+
+        if (transportInfra.OutboundRoutingPolicy.Publishes == OutboundRoutingType.Unicast)
+        {
+            //Register the auto-publish-to-router behavior
+
+            var autoSubscribeRouters = settingsCollection.Connections.Where(x => x.EnableAutoSubscribe).Select(x => x.RouterAddress).ToArray();
+            context.Pipeline.Register(b => new RouterAutoSubscribeBehavior(autoSubscribeRouters, b.Build<ISubscriptionStorage>()), "Automatically subscribes routers to published events.");
+        }
+
 
         context.Pipeline.Register(new ForwardSiteMessagesToRouterBehavior(), "Routes messages sent to sites to the bridge.");
         context.Pipeline.Register(new RoutingHeadersBehavior(compiledSettings), "Sets the ultimate destination endpoint on the outgoing messages.");

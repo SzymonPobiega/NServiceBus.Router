@@ -4,22 +4,23 @@ using NServiceBus.Router;
 
 class SubscribePreroutingTerminator : ChainTerminator<SubscribePreroutingContext>
 {
-    public SubscribePreroutingTerminator(IRoutingProtocol routingProtocol, RuntimeTypeGenerator typeGenerator)
+    public SubscribePreroutingTerminator(string[] allInterfaces, IRoutingProtocol routingProtocol, RuntimeTypeGenerator typeGenerator)
     {
+        this.allInterfaces = allInterfaces;
         this.routingProtocol = routingProtocol;
         this.typeGenerator = typeGenerator;
     }
     protected override async Task<bool> Terminate(SubscribePreroutingContext context)
     {
-        if (!context.Destinations.Any())
-        {
-            return false;
-        }
+        var interfaces = context.Extensions.Get<IInterfaceChains>();
 
-        var outgoingInterfaces = routingProtocol.RouteTable.GetOutgoingInterfaces(context.IncomingInterface, context.Destinations);
+        //If no publisher is provided forward the subscribe to all outgoing interfaces
+        var outgoingInterfaces = context.Destinations.Any()
+            ? routingProtocol.RouteTable.GetOutgoingInterfaces(context.IncomingInterface, context.Destinations)
+            : allInterfaces.Where(i => i != context.IncomingInterface);
+
         var routes = routingProtocol.RouteTable.Route(context.IncomingInterface, context.Destinations).ToArray();
 
-        var interfaces = context.Extensions.Get<IInterfaceChains>();
         var forkTasks = outgoingInterfaces
             .Select(iface =>
             {
@@ -33,6 +34,7 @@ class SubscribePreroutingTerminator : ChainTerminator<SubscribePreroutingContext
         return true;
     }
 
+    readonly string[] allInterfaces;
     IRoutingProtocol routingProtocol;
     RuntimeTypeGenerator typeGenerator;
 }

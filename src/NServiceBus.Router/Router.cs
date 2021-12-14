@@ -43,7 +43,7 @@ namespace NServiceBus.Router
 
             chains.AddChain(cb => cb.Begin<SubscribePreroutingContext>().Terminate());
             chains.AddRule(_ => new FindSubscribeDestinationsByHeadersRule());
-            chains.AddRule(c => new SubscribePreroutingTerminator(config.RoutingProtocol, c.TypeGenerator));
+            chains.AddRule(c => new SubscribePreroutingTerminator(allInterfaceNames, config.RoutingProtocol, c.TypeGenerator));
             chains.AddChain(cb => cb.Begin<ForwardSubscribeContext>().Terminate());
             chains.AddRule(c => new ForwardSubscribeGatewayRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName));
 

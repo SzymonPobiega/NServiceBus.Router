@@ -21,23 +21,25 @@ class RouterSubscribeBehavior : Behavior<ISubscribeContext>
     public override async Task Invoke(ISubscribeContext context, Func<Task> next)
     {
         var eventType = context.EventType;
-        if (compiledSettings.TryGetPublisher(eventType, out var publisherInfo))
+        compiledSettings.TryGetPublisher(eventType, out var publisherInfo);
+
+        //Router auto-subscribe
+        foreach (var router in compiledSettings.AutoSubscribeRouters)
+        {
+            if (publisherInfo != null && publisherInfo.Router == router)
+            {
+                //We have an explicit publisher registration for this router
+                continue;
+            }
+            Logger.Debug($"Sending subscribe request for {eventType.AssemblyQualifiedName} to router queue {router}.");
+            await SendSubscribeMessage(context, eventType, null, router).ConfigureAwait(false);
+        }
+
+        if (publisherInfo != null)
         {
             Logger.Debug($"Sending subscribe request for {eventType.AssemblyQualifiedName} to router queue {publisherInfo.Router} to be forwarded to {publisherInfo.Endpoint}");
 
-            var subscriptionMessage = ControlMessageFactory.Create(MessageIntentEnum.Subscribe);
-
-            subscriptionMessage.Headers[Headers.SubscriptionMessageType] = eventType.AssemblyQualifiedName;
-            subscriptionMessage.Headers[Headers.ReplyToAddress] = subscriberAddress;
-            subscriptionMessage.Headers[Headers.SubscriberTransportAddress] = subscriberAddress;
-            subscriptionMessage.Headers[Headers.SubscriberEndpoint] = subscriberEndpoint;
-            subscriptionMessage.Headers["NServiceBus.Bridge.DestinationEndpoint"] = publisherInfo.Endpoint;
-            subscriptionMessage.Headers[Headers.TimeSent] = DateTimeExtensions.ToWireFormattedString(DateTime.UtcNow);
-            subscriptionMessage.Headers[Headers.NServiceBusVersion] = "6.3.1"; //The code has been copied from 6.3.1
-
-            var transportOperation = new TransportOperation(subscriptionMessage, new UnicastAddressTag(publisherInfo.Router));
-            var transportTransaction = context.Extensions.GetOrCreate<TransportTransaction>();
-            await dispatcher.Dispatch(new TransportOperations(transportOperation), transportTransaction, context.Extensions).ConfigureAwait(false);
+            await SendSubscribeMessage(context, eventType, publisherInfo.Endpoint, publisherInfo.Router).ConfigureAwait(false);
 
             if (nativePubSub)
             {
@@ -48,6 +50,27 @@ class RouterSubscribeBehavior : Behavior<ISubscribeContext>
         {
             await next().ConfigureAwait(false);
         }
+    }
+
+    async Task SendSubscribeMessage(ISubscribeContext context, Type eventType, string publisherEndpoint, string router)
+    {
+        var subscriptionMessage = ControlMessageFactory.Create(MessageIntentEnum.Subscribe);
+
+        subscriptionMessage.Headers[Headers.SubscriptionMessageType] = eventType.AssemblyQualifiedName;
+        subscriptionMessage.Headers[Headers.ReplyToAddress] = subscriberAddress;
+        subscriptionMessage.Headers[Headers.SubscriberTransportAddress] = subscriberAddress;
+        subscriptionMessage.Headers[Headers.SubscriberEndpoint] = subscriberEndpoint;
+        subscriptionMessage.Headers[Headers.TimeSent] = DateTimeExtensions.ToWireFormattedString(DateTime.UtcNow);
+        subscriptionMessage.Headers[Headers.NServiceBusVersion] = "6.3.1"; //The code has been copied from 6.3.1
+
+        if (publisherEndpoint != null)
+        {
+            subscriptionMessage.Headers["NServiceBus.Bridge.DestinationEndpoint"] = publisherEndpoint;
+        }
+
+        var transportOperation = new TransportOperation(subscriptionMessage, new UnicastAddressTag(router));
+        var transportTransaction = context.Extensions.GetOrCreate<TransportTransaction>();
+        await dispatcher.Dispatch(new TransportOperations(transportOperation), transportTransaction, context.Extensions).ConfigureAwait(false);
     }
 
     IDispatchMessages dispatcher;

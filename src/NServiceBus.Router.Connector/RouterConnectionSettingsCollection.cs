@@ -7,11 +7,11 @@ class RouterConnectionSettingsCollection
 
     public IReadOnlyCollection<RouterConnectionSettings> Connections => collection.Values;
 
-    public RouterConnectionSettings GetOrCreate(string routerAddress)
+    public RouterConnectionSettings GetOrCreate(string routerAddress, bool enableAutoSubscribe, bool enableAutoPublish)
     {
         if (!collection.TryGetValue(routerAddress, out var value))
         {
-            value = new RouterConnectionSettings(routerAddress);
+            value = new RouterConnectionSettings(routerAddress, enableAutoSubscribe, enableAutoPublish);
             collection[routerAddress] = value;
         }
 

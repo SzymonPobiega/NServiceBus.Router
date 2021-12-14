@@ -8,9 +8,11 @@ namespace NServiceBus
     /// </summary>
     public class RouterConnectionSettings
     {
-        internal RouterConnectionSettings(string routerAddress)
+        internal RouterConnectionSettings(string routerAddress, bool enableAutoSubscribe, bool enableAutoPublish)
         {
             RouterAddress = routerAddress;
+            this.EnableAutoSubscribe = enableAutoSubscribe;
+            this.EnableAutoPublish = enableAutoPublish;
         }
 
         /// <summary>
@@ -44,6 +46,8 @@ namespace NServiceBus
         }
 
         internal string RouterAddress;
+        internal bool EnableAutoSubscribe;
+        internal bool EnableAutoPublish;
         internal Dictionary<Type, string> SendRouteTable = new Dictionary<Type, string>();
         internal Dictionary<Type, string> PublisherTable = new Dictionary<Type, string>();
     }
