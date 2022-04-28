@@ -22,10 +22,11 @@ class ReplyPreroutingTerminator : ChainTerminator<ReplyPreroutingContext>
         string destinationIface = null;
 
         if (!context.Headers.TryGetValue(RouterHeaders.ReplyToTrace, out var replyToTrace)
-         && !context.Headers.TryGetValue(Headers.CorrelationId, out replyToTrace))
+            && (!context.Headers.TryGetValue(Headers.CorrelationId, out replyToTrace) || replyToTrace is null))
         {
             throw new UnforwardableMessageException($"The reply has to contain either '{Headers.CorrelationId}' header set by the sending endpoint or '{RouterHeaders.ReplyToTrace}' set by the replying endpoint in order to be routed.");
         }
+
         try
         {
             replyToTrace.DecodeTLV((t, v) =>

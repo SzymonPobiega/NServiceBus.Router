@@ -75,7 +75,7 @@ abstract class ReplyTraceRule
             newCorrelationId = newCorrelationId.AppendTLV("reply-to", replyToHeader);
         }
 
-        if (context.ForwardedHeaders.TryGetValue(Headers.CorrelationId, out var correlationId))
+        if (context.ForwardedHeaders.TryGetValue(Headers.CorrelationId, out var correlationId) && correlationId != null)
         {
             newCorrelationId = newCorrelationId.AppendTLV("id", correlationId);
         }
@@ -92,7 +92,7 @@ abstract class ReplyTraceRule
     /// </summary>
     static void UnwrapCorrelationIdAndSetTraceHeader(BaseForwardRuleContext context)
     {
-        if (context.ForwardedHeaders.TryGetValue(Headers.CorrelationId, out var correlationId))
+        if (context.ForwardedHeaders.TryGetValue(Headers.CorrelationId, out var correlationId) && correlationId != null)
         {
             while (true)
             {
