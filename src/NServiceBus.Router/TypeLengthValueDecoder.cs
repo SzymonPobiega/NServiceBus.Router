@@ -14,6 +14,11 @@ static class TLV
 
     public static bool TryDecodeTLV(this string tlvString, Action<string, string> valueCallback)
     {
+        if (tlvString is null)
+        {
+            return false;
+        }
+
         var remaining = tlvString;
         while (true)
         {
