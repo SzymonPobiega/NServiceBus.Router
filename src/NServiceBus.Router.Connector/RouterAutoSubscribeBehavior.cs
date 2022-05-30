@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using NServiceBus.Extensibility;
 using NServiceBus.Pipeline;
@@ -8,13 +10,13 @@ using NServiceBus.Unicast.Subscriptions.MessageDrivenSubscriptions;
 
 class RouterAutoSubscribeBehavior : Behavior<IOutgoingPublishContext>
 {
-    string[] autoSubscribedRouters;
+    readonly IEnumerable<string> autoPublishRouters;
     readonly ISubscriptionStorage subscriptionStorage;
     readonly ConcurrentDictionary<Type, bool> cache = new ConcurrentDictionary<Type, bool>();
 
-    public RouterAutoSubscribeBehavior(string[] autoSubscribedRouters, ISubscriptionStorage subscriptionStorage)
+    public RouterAutoSubscribeBehavior(IEnumerable<string> autoPublishRouters, ISubscriptionStorage subscriptionStorage)
     {
-        this.autoSubscribedRouters = autoSubscribedRouters;
+        this.autoPublishRouters = autoPublishRouters.ToArray();
         this.subscriptionStorage = subscriptionStorage;
     }
 
@@ -29,7 +31,7 @@ class RouterAutoSubscribeBehavior : Behavior<IOutgoingPublishContext>
             return;
         }
 
-        foreach (var router in autoSubscribedRouters)
+        foreach (var router in autoPublishRouters)
         {
             var subscriber = new Subscriber(router, null);
             await subscriptionStorage.Subscribe(subscriber, new MessageType(messageType), new ContextBag()).ConfigureAwait(false);

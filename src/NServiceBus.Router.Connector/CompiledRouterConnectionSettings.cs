@@ -6,6 +6,7 @@ class CompiledRouterConnectionSettings
     Dictionary<Type, DestinationInfo> eventRouting = new Dictionary<Type, DestinationInfo>();
     Dictionary<Type, DestinationInfo> commandRouting = new Dictionary<Type, DestinationInfo>();
     List<string> autoSubscribeRouters = new List<string>();
+    List<string> autoPublishRouters = new List<string>();
     string defaultRouter;
 
     public CompiledRouterConnectionSettings(RouterConnectionSettingsCollection collection)
@@ -20,6 +21,11 @@ class CompiledRouterConnectionSettings
             if (router.EnableAutoSubscribe)
             {
                 autoSubscribeRouters.Add(router.RouterAddress);
+            }
+
+            if (router.EnableAutoPublish)
+            {
+                autoPublishRouters.Add(router.RouterAddress);
             }
 
             foreach (var publisherEntry in router.PublisherTable)
@@ -43,6 +49,7 @@ class CompiledRouterConnectionSettings
     }
 
     public IEnumerable<string> AutoSubscribeRouters => autoSubscribeRouters;
+    public IEnumerable<string> AutoPublishRouters => autoPublishRouters;
 
     public bool TryGetPublisher(Type eventType, out DestinationInfo destinationInfo)
     {

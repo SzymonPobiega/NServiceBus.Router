@@ -32,8 +32,7 @@ class RouterConnectionFeature : Feature
         {
             //Register the auto-publish-to-router behavior
 
-            var autoSubscribeRouters = settingsCollection.Connections.Where(x => x.EnableAutoSubscribe).Select(x => x.RouterAddress).ToArray();
-            context.Pipeline.Register(b => new RouterAutoSubscribeBehavior(autoSubscribeRouters, b.Build<ISubscriptionStorage>()), "Automatically subscribes routers to published events.");
+            context.Pipeline.Register(b => new RouterAutoSubscribeBehavior(compiledSettings.AutoPublishRouters, b.Build<ISubscriptionStorage>()), "Automatically subscribes routers to published events.");
         }
 
 
