@@ -4,6 +4,8 @@
 
 Cross-transport, cross-site and cross-cloud router component for NServiceBus.
 
+NOTE: The officially supported [Bridge](https://docs.particular.net/nservicebus/bridge/) from Particular Software supports similar use cases as the Router
+
 ## Documentation
 
 For documentation about the usage patterns, go to [Particular Platform Docs](https://docs.particular.net/nservicebus/router/).
