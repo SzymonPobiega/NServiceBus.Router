@@ -41,7 +41,7 @@
             typeof(DoNotDeliverBefore)
         };
 
-        public override TransportTransactionMode TransactionMode => TransportTransactionMode.SendsAtomicWithReceive;
+        public override TransportTransactionMode TransactionMode => TransportTransactionMode.ReceiveOnly;
 
         public override OutboundRoutingPolicy OutboundRoutingPolicy { get; }
 

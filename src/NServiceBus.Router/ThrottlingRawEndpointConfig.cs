@@ -141,11 +141,30 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
         throttledConfig.LimitMessageProcessingConcurrencyTo(1);
         return throttledConfig;
     }
+    
     public async Task<IStartableRawEndpoint> Create()
     {
         startable = await RawEndpoint.Create(config);
+        ValidateTransactionMode(startable);
         config = null;
         return this;
+    }
+
+    static void ValidateTransactionMode(IStartableRawEndpoint startableRawEndpoint)
+    {
+        var infra = startableRawEndpoint.Settings.Get<TransportInfrastructure>();
+
+        if (startableRawEndpoint.Settings.TryGet<TransportTransactionMode>(out var selectedMode))
+        {
+            if (selectedMode == TransportTransactionMode.SendsAtomicWithReceive)
+            {
+                throw new Exception("Router cannot operate in SendsAtomicWithReceive transaction mode. Please select other transaction mode.");
+            }
+        }
+        else if (infra.TransactionMode == TransportTransactionMode.SendsAtomicWithReceive)
+        {
+            throw new Exception($"{infra.GetType()} defaults to SendsAtomicWithReceive transaction mode. Router cannot operate in that mode. Customize the transport configuration to use SendsAtomicWithReceive mode.");
+        }
     }
 
     async Task<IReceivingRawEndpoint> IStartableRawEndpoint.Start()
