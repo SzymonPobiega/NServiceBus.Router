@@ -3,8 +3,8 @@
     using System;
     using System.Collections.Generic;
     using System.Data.Common;
-    using System.Data.SqlClient;
     using System.Text;
+    using Microsoft.Data.SqlClient;
     using Unicast.Subscriptions;
 
     public partial class SqlDialect

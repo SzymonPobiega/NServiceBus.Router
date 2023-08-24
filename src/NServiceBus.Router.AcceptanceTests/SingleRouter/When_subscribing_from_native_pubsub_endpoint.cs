@@ -1,7 +1,5 @@
 ﻿using System.Threading.Tasks;
 using NServiceBus.AcceptanceTesting;
-using NServiceBus.AcceptanceTests;
-using NServiceBus.AcceptanceTests.EndpointTemplates;
 using NUnit.Framework;
 
 namespace NServiceBus.Router.AcceptanceTests.SingleRouter
@@ -19,8 +17,8 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
                 {
-                    cfg.AddInterface<TestTransport>("A", t => t.BrokerAlpha()).InMemorySubscriptions();
-                    cfg.AddInterface<TestTransport>("B", t => t.BrokerYankee());
+                    cfg.AddInterface("A", false).Broker().Alpha();
+                    cfg.AddInterface("B").Broker().Yankee();
 
                     cfg.UseStaticRoutingProtocol().AddForwardRoute("B", "A");
                 })
@@ -49,7 +47,8 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 EndpointSetup<DefaultServer>(c =>
                 {
                     //No bridge configuration needed for publisher
-                    c.UseTransport<TestTransport>().BrokerAlpha();
+                    c.ConfigureBroker().Alpha();
+                    c.ConfigureRouting().EnableMessageDrivenPubSubCompatibilityMode();
 
                     c.OnEndpointSubscribed<Context>((args, context) =>
                     {
@@ -72,8 +71,9 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    var routing = c.UseTransport<TestTransport>().BrokerYankee()
-                        .Routing();
+                    c.ConfigureBroker().Yankee();
+
+                    var routing = c.ConfigureRouting();
 
                     var ramp = routing.ConnectToRouter("Router");
                     ramp.RegisterPublisher(typeof(MyBaseEvent2), PublisherEndpoint);
@@ -103,8 +103,9 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    var routing = c.UseTransport<TestTransport>().BrokerYankee()
-                        .Routing();
+                    c.ConfigureBroker().Yankee();
+
+                    var routing = c.ConfigureRouting();
 
                     var ramp = routing.ConnectToRouter("Router");
                     ramp.RegisterPublisher(typeof(MyDerivedEvent2), PublisherEndpoint);

@@ -1,5 +1,6 @@
 ﻿namespace NServiceBus.Router
 {
+    using System;
     using Transport;
 
     /// <summary>
@@ -8,7 +9,7 @@
     public class RawContext : BasePreroutingContext
     {
         internal RawContext(MessageContext messageContext, string incomingInterface, RootContext root) 
-            : base(root, incomingInterface, new ReceivedMessageHeaders(messageContext.Headers), messageContext.MessageId)
+            : base(root, incomingInterface, new ReceivedMessageHeaders(messageContext.Headers), messageContext.NativeMessageId)
         {
             Set(messageContext.TransportTransaction);
 
@@ -18,6 +19,6 @@
         /// <summary>
         /// The body of the received message.
         /// </summary>
-        public byte[] Body { get; }
+        public ReadOnlyMemory<byte> Body { get; }
     }
 }

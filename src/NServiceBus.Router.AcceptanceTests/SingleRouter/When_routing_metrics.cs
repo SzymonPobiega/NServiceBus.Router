@@ -1,7 +1,5 @@
 ﻿using System.Threading.Tasks;
 using NServiceBus.AcceptanceTesting;
-using NServiceBus.AcceptanceTests;
-using NServiceBus.AcceptanceTests.EndpointTemplates;
 using NUnit.Framework;
 
 namespace NServiceBus.Router.AcceptanceTests.SingleRouter
@@ -15,16 +13,24 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
         [Test]
         public async Task Should_deliver_the_reply_without_the_need_to_configure_the_bridge()
         {
+            var spyTransport = new AcceptanceTestingTransport(false, false);
+            spyTransport.Broker().Bravo();
+
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
                 {
-                    cfg.AddInterface<TestTransport>("MSMQ", t => t.Transactions(TransportTransactionMode.ReceiveOnly).BrokerAlpha()).DisableMessageDrivenPublishSubscribe();
-                    cfg.AddInterface<TestTransport>("SQL", t => t.BrokerBravo()).DisableMessageDrivenPublishSubscribe();
+                    var msmq = cfg.AddInterface("MSMQ");
+                    msmq.DisableMessageDrivenPublishSubscribe();
+                    msmq.Broker().Alpha();
+                    var sql = cfg.AddInterface("SQL"); 
+                    sql.DisableMessageDrivenPublishSubscribe();
+                    sql.Broker().Bravo();
+
                     cfg.UseStaticRoutingProtocol();
 
                     cfg.AddRule(c => new MetricsPreroutingTerminator("SQL", "Metrics"));
                 })
-                .WithSpyComponent("Metrics", t => t.BrokerBravo(), (scenarioContext, messageContext, _) =>
+                .WithSpyComponent("Metrics",  spyTransport, (scenarioContext, messageContext, _, __) =>
                 {
                     if (messageContext.Headers.TryGetValue(Headers.EnclosedMessageTypes, out var messageTypes)
                         && messageTypes == "NServiceBus.Metrics.EndpointMetadataReport")
@@ -81,7 +87,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    c.UseTransport<TestTransport>().BrokerAlpha();
+                    c.ConfigureBroker().Alpha();
                     c.EnableMetrics().SendMetricDataToServiceControl("Router", TimeSpan.FromSeconds(1));
                 });
             }

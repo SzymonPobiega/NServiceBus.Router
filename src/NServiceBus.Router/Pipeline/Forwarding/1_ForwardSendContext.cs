@@ -1,5 +1,6 @@
 ﻿namespace NServiceBus.Router
 {
+    using System;
     using System.Collections.Generic;
 
     /// <summary>
@@ -31,6 +32,6 @@
         /// <summary>
         /// The headers associated with the received message.
         /// </summary>
-        public byte[] ReceivedBody { get; }
+        public ReadOnlyMemory<byte> ReceivedBody { get; }
     }
 }

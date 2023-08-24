@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
 using NServiceBus;
 using NServiceBus.Features;
 using NServiceBus.Routing;
@@ -9,8 +10,9 @@ class RouterConnectionFeature : Feature
 {
     protected override void Setup(FeatureConfigurationContext context)
     {
-        var transportInfra = context.Settings.Get<TransportInfrastructure>();
-        var nativePubSub = transportInfra.OutboundRoutingPolicy.Publishes == OutboundRoutingType.Multicast;
+        var transportDefinition = context.Settings.Get<TransportDefinition>();
+
+        var nativePubSub = transportDefinition.SupportsPublishSubscribe;
         var settingsCollection = context.Settings.Get<RouterConnectionSettingsCollection>();
         var unicastRouteTable = context.Settings.Get<UnicastRoutingTable>();
         var bindings = context.Settings.Get<QueueBindings>();
@@ -28,11 +30,11 @@ class RouterConnectionFeature : Feature
             unicastRouteTable.AddOrReplaceRoutes("NServiceBus.Router_"+connection.RouterAddress, routes);
         }
 
-        if (transportInfra.OutboundRoutingPolicy.Publishes == OutboundRoutingType.Unicast)
+        if (!nativePubSub)
         {
             //Register the auto-publish-to-router behavior
 
-            context.Pipeline.Register(b => new RouterAutoSubscribeBehavior(compiledSettings.AutoPublishRouters, b.Build<ISubscriptionStorage>()), "Automatically subscribes routers to published events.");
+            context.Pipeline.Register(b => new RouterAutoSubscribeBehavior(compiledSettings.AutoPublishRouters, b.GetService<ISubscriptionStorage>()), "Automatically subscribes routers to published events.");
         }
 
 
@@ -43,12 +45,19 @@ class RouterConnectionFeature : Feature
         var isSendOnlyEndpoint = context.Settings.GetOrDefault<bool>("Endpoint.SendOnly");
         if (!isSendOnlyEndpoint)
         {
-            var distributorAddress = context.Settings.GetOrDefault<string>("LegacyDistributor.Address");
-            var subscriberAddress = distributorAddress ?? context.Settings.LocalAddress();
+            var subscriberAddress = context.LocalQueueAddress();
 
-            context.Pipeline.Register(b => new RouterSubscribeBehavior(subscriberAddress, context.Settings.EndpointName(), b.Build<IDispatchMessages>(), compiledSettings, nativePubSub),
+            context.Pipeline.Register(b =>
+                {
+                    var resolver = b.GetService<ITransportAddressResolver>();
+                    return new RouterSubscribeBehavior(resolver.ToTransportAddress(subscriberAddress), context.Settings.EndpointName(), b.GetService<IMessageDispatcher>(), compiledSettings, nativePubSub);
+                },
                 "Dispatches the subscribe request via a router.");
-            context.Pipeline.Register(b => new RouterUnsubscribeBehavior(subscriberAddress, context.Settings.EndpointName(), b.Build<IDispatchMessages>(), compiledSettings, nativePubSub),
+            context.Pipeline.Register(b =>
+                {
+                    var resolver = b.GetService<ITransportAddressResolver>();
+                    return new RouterUnsubscribeBehavior(resolver.ToTransportAddress(subscriberAddress), context.Settings.EndpointName(), b.GetService<IMessageDispatcher>(), compiledSettings, nativePubSub);
+                },
                 "Dispatches the unsubscribe request via a router.");
         }
     }

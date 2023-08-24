@@ -7,8 +7,8 @@ class PreroutingToSubscribePreroutingFork : IRule<PreroutingContext, PreroutingC
 {
     public async Task Invoke(PreroutingContext context, Func<PreroutingContext, Task> next)
     {
-        if (context.Intent == MessageIntentEnum.Subscribe
-            || context.Intent == MessageIntentEnum.Unsubscribe)
+        if (context.Intent == MessageIntent.Subscribe
+            || context.Intent == MessageIntent.Unsubscribe)
         {
             var messageTypeString = GetSubscriptionMessageTypeFrom(context);
 
@@ -29,7 +29,7 @@ class PreroutingToSubscribePreroutingFork : IRule<PreroutingContext, PreroutingC
                 throw new UnforwardableMessageException("Either subscriber address or subscriber endpoint (or both) are required in a subscription message.");
             }
 
-            if (context.Intent == MessageIntentEnum.Subscribe)
+            if (context.Intent == MessageIntent.Subscribe)
             {
                 await context.Chains.Get<SubscribePreroutingContext>()
                     .Invoke(new SubscribePreroutingContext(context, messageTypeString, subscriberEndpoint, subscriberAddress))

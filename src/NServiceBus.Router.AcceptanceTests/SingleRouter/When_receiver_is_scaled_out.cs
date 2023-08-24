@@ -1,7 +1,5 @@
 ﻿using System.Threading.Tasks;
 using NServiceBus.AcceptanceTesting;
-using NServiceBus.AcceptanceTests;
-using NServiceBus.AcceptanceTests.EndpointTemplates;
 using NUnit.Framework;
 
 namespace NServiceBus.Router.AcceptanceTests.SingleRouter
@@ -21,9 +19,9 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
                 {
-                    cfg.AddInterface<TestTransport>("Left", t => t.BrokerAlpha()).InMemorySubscriptions();
-                    var right = cfg.AddInterface<TestTransport>("Right", t => t.BrokerBravo());
-                    right.InMemorySubscriptions();
+                    cfg.AddInterface("Left", false).Broker().Alpha();
+                    var right = cfg.AddInterface("Right", false);
+                    right.Broker().Bravo();
                     right.EndpointInstances.AddOrReplaceInstances("config",
                         new List<EndpointInstance>
                         {
@@ -63,7 +61,9 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    var routing = c.UseTransport<TestTransport>().BrokerAlpha().Routing();
+                    c.ConfigureBroker().Alpha();
+
+                    var routing = c.ConfigureRouting();
                     var bridge = routing.ConnectToRouter("Router");
                     bridge.RouteToEndpoint(typeof(MyRequest), ReceiverEndpointName);
                 });
@@ -76,7 +76,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                     {
-                        c.UseTransport<TestTransport>().BrokerBravo();
+                        c.ConfigureBroker().Bravo();
                         c.MakeInstanceUniquelyAddressable("A");
                     })
                     .CustomEndpointName(ReceiverEndpointName);
@@ -106,7 +106,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                     {
-                        c.UseTransport<TestTransport>().BrokerBravo();
+                        c.ConfigureBroker().Bravo();
                         c.MakeInstanceUniquelyAddressable("B");
                     })
                     .CustomEndpointName(ReceiverEndpointName);

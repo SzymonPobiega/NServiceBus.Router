@@ -19,7 +19,7 @@ class ForwardSubscribeMessageDrivenRule : ChainTerminator<ForwardSubscribeContex
         var immediateSubscribes = context.Routes.Where(r => r.Gateway == null);
         var forkContexts = immediateSubscribes.Select(r => 
             new MulticastContext(r.Destination, 
-                MessageDrivenPubSub.CreateMessage(null, context.MessageType, localAddress, localEndpoint, MessageIntentEnum.Subscribe), context))
+                MessageDrivenPubSub.CreateMessage(null, context.MessageType, localAddress, localEndpoint, MessageIntent.Subscribe), context))
             .ToArray();
 
         if (!forkContexts.Any())

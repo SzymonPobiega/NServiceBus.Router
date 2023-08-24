@@ -1,6 +1,7 @@
 ﻿namespace NServiceBus.Router
 {
     using System;
+    using System.Threading;
     using Extensibility;
 
     /// <summary>
@@ -15,6 +16,7 @@
             : base(parentContext.Extensions)
         {
             Interface = @interface ?? parentContext.Interface ?? throw new Exception("Interface is required.");
+            CancellationToken = parentContext.CancellationToken;
         }
 
         /// <summary>
@@ -24,6 +26,7 @@
             : base(parentContext?.Extensions)
         {
             Interface = @interface;
+            CancellationToken = parentContext.CancellationToken;
         }
 
         /// <summary>
@@ -40,5 +43,10 @@
         /// Allows extending the rule context by adding arbitrary values.
         /// </summary>
         public ContextBag Extensions => this;
+
+        /// <summary>
+        /// Cancellation token for the message processing.
+        /// </summary>
+        public CancellationToken CancellationToken { get; }
     }
 }

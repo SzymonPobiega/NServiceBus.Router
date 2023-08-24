@@ -10,9 +10,9 @@ class RuleCreationContext : IRuleCreationContext
     public RawDistributionPolicy DistributionPolicy { get; }
     public IRawEndpoint Endpoint { get; }
     public RuntimeTypeGenerator TypeGenerator { get; }
-    public ReadOnlySettings Settings { get; }
+    public IReadOnlySettings Settings { get; }
 
-    public RuleCreationContext(string interfaceName, EndpointInstances endpointInstances, RawDistributionPolicy distributionPolicy, IRawEndpoint endpoint, RuntimeTypeGenerator typeGenerator, ReadOnlySettings settings)
+    public RuleCreationContext(string interfaceName, EndpointInstances endpointInstances, RawDistributionPolicy distributionPolicy, IRawEndpoint endpoint, RuntimeTypeGenerator typeGenerator, IReadOnlySettings settings)
     {
         InterfaceName = interfaceName;
         EndpointInstances = endpointInstances;

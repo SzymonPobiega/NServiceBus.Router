@@ -20,7 +20,7 @@ class PostroutingTerminator : ChainTerminator<PostroutingContext>
         {
             AddTrace(operation);
         }
-        await dispatcher.Dispatch(new TransportOperations(context.Messages), context.Get<TransportTransaction>(), context)
+        await dispatcher.Dispatch(new TransportOperations(context.Messages), context.Get<TransportTransaction>(), context.CancellationToken)
             .ConfigureAwait(false);
         return true;
     }

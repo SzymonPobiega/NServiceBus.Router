@@ -1,19 +1,20 @@
 ﻿using System.Threading.Tasks;
 using NServiceBus.Router;
 using NServiceBus.Transport;
+using NServiceBus.Unicast.Messages;
 
 class ForwardUnsubscribeNativeRule : ChainTerminator<ForwardUnsubscribeContext>
 {
-    IManageSubscriptions subscriptionManager;
+    ISubscriptionManager subscriptionManager;
 
-    public ForwardUnsubscribeNativeRule(IManageSubscriptions subscriptionManager)
+    public ForwardUnsubscribeNativeRule(ISubscriptionManager subscriptionManager)
     {
         this.subscriptionManager = subscriptionManager;
     }
 
     protected override async Task<bool> Terminate(ForwardUnsubscribeContext context)
     {
-        await subscriptionManager.Unsubscribe(context.MessageRuntimeType, context).ConfigureAwait(false);
+        await subscriptionManager.Unsubscribe(new MessageMetadata(context.MessageRuntimeType), context).ConfigureAwait(false);
 
         return true;
     }

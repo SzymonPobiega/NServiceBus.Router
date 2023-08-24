@@ -19,7 +19,7 @@ class ForwardUnsubscribeGatewayRule : ChainTerminator<ForwardUnsubscribeContext>
         var forwardedSubscribes = context.Routes.Where(r => r.Gateway != null);
         var forkContexts = forwardedSubscribes.Select(r =>
             new AnycastContext(r.Gateway,
-                MessageDrivenPubSub.CreateMessage(r.Destination, context.MessageType, localAddress, localEndpoint, MessageIntentEnum.Unsubscribe),
+                MessageDrivenPubSub.CreateMessage(r.Destination, context.MessageType, localAddress, localEndpoint, MessageIntent.Unsubscribe),
                 DistributionStrategyScope.Send,
                 context)).ToArray();
 

@@ -1,7 +1,5 @@
 ﻿using System.Threading.Tasks;
 using NServiceBus.AcceptanceTesting;
-using NServiceBus.AcceptanceTests;
-using NServiceBus.AcceptanceTests.EndpointTemplates;
 using NServiceBus.Features;
 using NUnit.Framework;
 
@@ -20,11 +18,12 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
                 {
-                    var left = cfg.AddInterface<TestTransport>("Left", t => t.BrokerYankee());
+                    var left = cfg.AddInterface("Left");
+                    left.Broker().Yankee();
                     //To ensure when tracer arrives the subscribe request has already been processed.
                     left.LimitMessageProcessingConcurrencyTo(1);
 
-                    cfg.AddInterface<TestTransport>("Right", t => t.BrokerZulu());
+                    cfg.AddInterface("Right").Broker().Zulu();
 
                     cfg.UseStaticRoutingProtocol().AddForwardRoute("Right", "Left");
                 })
@@ -54,7 +53,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 EndpointSetup<DefaultServer>(c =>
                 {
                     //No bridge configuration needed for publisher
-                    c.UseTransport<TestTransport>().BrokerYankee();
+                    c.ConfigureBroker().Yankee();
                 });
             }
 
@@ -97,8 +96,10 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
+                    c.ConfigureBroker().Zulu();
+
                     c.DisableFeature<AutoSubscribe>();
-                    var routing = c.UseTransport<TestTransport>().BrokerZulu().Routing();
+                    var routing = c.ConfigureRouting();
                     var bridge = routing.ConnectToRouter("Router");
                     bridge.RegisterPublisher(typeof(MyEvent), PublisherEndpoint);
                     bridge.RouteToEndpoint(typeof(TracerMessage), PublisherEndpoint);

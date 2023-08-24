@@ -1,13 +1,9 @@
 ﻿using System.Threading.Tasks;
 using NServiceBus.AcceptanceTesting;
-using NServiceBus.AcceptanceTests;
-using NServiceBus.AcceptanceTests.EndpointTemplates;
 using NUnit.Framework;
 
 namespace NServiceBus.Router.AcceptanceTests.SingleRouter
 {
-    using InMemoryPersistence = global::InMemoryPersistence;
-
     [TestFixture]
     public class When_publishing_from_message_driven_endpoint_auto : NServiceBusAcceptanceTest
     {
@@ -20,9 +16,15 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
                 {
-                    cfg.AddInterface<TestTransport>("A", t => t.BrokerAlpha()).EnableMessageDrivenPublishSubscribe(alphaSubscriptionStore);
-                    cfg.AddInterface<TestTransport>("B", t => t.BrokerBravo()).EnableMessageDrivenPublishSubscribe(bravoSubscriptionStore);
-                    cfg.AddInterface<TestTransport>("C", t => t.BrokerYankee());
+                    var a = cfg.AddInterface("A", false);
+                    a.EnableMessageDrivenPublishSubscribe(alphaSubscriptionStore);
+                    a.Broker().Alpha();
+
+                    var b = cfg.AddInterface("B", false);
+                    b.EnableMessageDrivenPublishSubscribe(alphaSubscriptionStore);
+                    b.Broker().Bravo();
+
+                    cfg.AddInterface("C").Broker().Yankee();
 
                     cfg.UseStaticRoutingProtocol();
                 })
@@ -34,7 +36,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                     }).When(x => x.EndpointsStarted, async (s, ctx) =>
                     {
                         //Need to retry sending because there is no reliable way to figure when the router is subscribed
-                        while (!ctx.BaseEventDelivered || !ctx.DerivedEventDelivered) 
+                        while (!ctx.BaseEventDelivered || !ctx.DerivedEventDelivered)
                         {
                             await s.Publish(new MyDerivedEvent2());
                             await Task.Delay(1000);
@@ -65,7 +67,10 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    var routing = c.UseTransport<TestTransport>().BrokerAlpha().Routing();
+                    c.ConfigureBroker().Alpha();
+                    c.ConfigureRouting().EnableMessageDrivenPubSubCompatibilityMode();
+
+                    var routing = c.ConfigureRouting();
 
                     routing.ConnectToRouter("Router", false, true);
                 });
@@ -78,9 +83,11 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    var routing = c.UseTransport<TestTransport>().BrokerBravo()
-                        .Routing();
+                    c.ConfigureBroker().Bravo();
+                    c.ConfigureRouting().EnableMessageDrivenPubSubCompatibilityMode();
 
+                    var routing = c.ConfigureRouting();
+                    
                     routing.ConnectToRouter("Router", true, false);
                 });
             }
@@ -108,8 +115,9 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    var routing = c.UseTransport<TestTransport>().BrokerYankee()
-                        .Routing();
+                    c.ConfigureBroker().Yankee();
+
+                    var routing = c.ConfigureRouting();
 
                     routing.ConnectToRouter("Router", true, false);
                 });

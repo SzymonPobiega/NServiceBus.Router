@@ -2,22 +2,19 @@
 using System.Threading;
 using System.Threading.Tasks;
 using NServiceBus;
-using NServiceBus.Extensibility;
 using NServiceBus.Logging;
 using NServiceBus.Raw;
 using NServiceBus.Router;
 using NServiceBus.Routing;
-using NServiceBus.Settings;
 using NServiceBus.Transport;
 
-delegate Task<ErrorHandleResult> PoisonMessageHandling(IErrorHandlingPolicyContext handlingContext, IDispatchMessages dispatcher);
+delegate Task<ErrorHandleResult> PoisonMessageHandling(IErrorHandlingPolicyContext handlingContext, IMessageDispatcher dispatcher);
 
-class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpoint
-    where T : TransportDefinition, new()
+class ThrottlingRawEndpointConfig : IStartableRawEndpoint, IReceivingRawEndpoint
 {
-    public ThrottlingRawEndpointConfig(string queue, string poisonMessageQueueName, Action<TransportExtensions<T>> transportCustomization, 
-        Func<MessageContext, IDispatchMessages, Task> onMessage, PoisonMessageHandling poisonMessageHandling, 
-        int? maximumConcurrency, int immediateRetries, int delayedRetries, int circuitBreakerThreshold, bool autoCreateQueue, string autoCreateQueueIdentity = null)
+    public ThrottlingRawEndpointConfig(string queue, string poisonMessageQueueName, TransportDefinition transport, 
+        Func<MessageContext, IMessageDispatcher, CancellationToken, Task> onMessage, PoisonMessageHandling poisonMessageHandling, 
+        int? maximumConcurrency, int immediateRetries, int delayedRetries, int circuitBreakerThreshold, bool autoCreateQueue)
     {
         if (immediateRetries < 0)
         {
@@ -31,12 +28,17 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
         {
             throw new ArgumentException("Circuit breaker threshold must not be less than zero.", nameof(circuitBreakerThreshold));
         }
-        config = PrepareConfig(queue, poisonMessageQueueName, transportCustomization, onMessage, poisonMessageHandling, maximumConcurrency, immediateRetries, delayedRetries, circuitBreakerThreshold, autoCreateQueue, autoCreateQueueIdentity);
+
+        if (transport.TransportTransactionMode == TransportTransactionMode.SendsAtomicWithReceive)
+        {
+            throw new Exception("Router cannot operate in SendsAtomicWithReceive transaction mode. Please select other transaction mode.");
+        }
+        config = PrepareConfig(queue, poisonMessageQueueName, transport, onMessage, poisonMessageHandling, maximumConcurrency, immediateRetries, delayedRetries, circuitBreakerThreshold, autoCreateQueue);
     }
 
-    RawEndpointConfiguration PrepareConfig(string inputQueue, string poisonMessageQueueName, Action<TransportExtensions<T>> transportCustomization, 
-        Func<MessageContext, IDispatchMessages, Task> onMessage, PoisonMessageHandling poisonMessageHandling, int? maximumConcurrency, 
-        int immediateRetries, int delayedRetries, int circuitBreakerThreshold, bool autoCreateQueue, string autoCreateQueueIdentity)
+    RawEndpointConfiguration PrepareConfig(string inputQueue, string poisonMessageQueueName, TransportDefinition transport,
+        Func<MessageContext, IMessageDispatcher, CancellationToken, Task> onMessage, PoisonMessageHandling poisonMessageHandling, int? maximumConcurrency, 
+        int immediateRetries, int delayedRetries, int circuitBreakerThreshold, bool autoCreateQueue)
     {
         var circuitBreaker = new RepeatedFailuresCircuitBreaker(inputQueue, circuitBreakerThreshold, e =>
         {
@@ -47,7 +49,7 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
                 try
                 {
                     var oldEndpoint = endpoint;
-                    var throttledConfig = PrepareThrottledConfig(inputQueue, poisonMessageQueueName, transportCustomization, onMessage, poisonMessageHandling, maximumConcurrency, immediateRetries, circuitBreakerThreshold, delayedRetries);
+                    var throttledConfig = PrepareThrottledConfig(inputQueue, poisonMessageQueueName, transport, onMessage, poisonMessageHandling, maximumConcurrency, immediateRetries, circuitBreakerThreshold, delayedRetries);
                     var newEndpoint = await RawEndpoint.Start(throttledConfig).ConfigureAwait(false);
                     endpoint = newEndpoint;
                     await oldEndpoint.Stop().ConfigureAwait(false);
@@ -62,26 +64,24 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
                 }
             });
         });
-        var regularConfig = RawEndpointConfiguration.Create(inputQueue, async (context, dispatcher) =>
+        var regularConfig = RawEndpointConfiguration.Create(inputQueue, transport, async (context, dispatcher, token) =>
         {
-            await onMessage(context, dispatcher).ConfigureAwait(false);
+            await onMessage(context, dispatcher, token).ConfigureAwait(false);
             circuitBreaker.Success();
         }, poisonMessageQueueName);
         regularConfig.CustomErrorHandlingPolicy(new RegularModePolicy(inputQueue, circuitBreaker, poisonMessageHandling, immediateRetries, delayedRetries));
 
-        Task onCriticalError(ICriticalErrorContext context)
+        Task onCriticalError(ICriticalErrorContext context, CancellationToken token)
         {
             logger.Fatal($"The receiver for queue {inputQueue} has encountered a severe error that is likely related to the connectivity with the broker or the broker itself.");
             return Task.CompletedTask;
         }
 
-        regularConfig.Settings.Set("onCriticalErrorAction", (Func<ICriticalErrorContext, Task>)onCriticalError);
+        regularConfig.CriticalErrorAction(onCriticalError);
 
-        var transport = regularConfig.UseTransport<T>();
-        transportCustomization(transport);
         if (autoCreateQueue)
         {
-            regularConfig.AutoCreateQueue(autoCreateQueueIdentity);
+            regularConfig.AutoCreateQueues();
         }
         if (maximumConcurrency.HasValue)
         {
@@ -90,14 +90,14 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
         return regularConfig;
     }
 
-    RawEndpointConfiguration PrepareThrottledConfig(string inputQueue, string poisonMessageQueueName, Action<TransportExtensions<T>> transportCustomization, 
-        Func<MessageContext, IDispatchMessages, Task> onMessage, PoisonMessageHandling poisonMessageHandling, int? maximumConcurrency, 
+    RawEndpointConfiguration PrepareThrottledConfig(string inputQueue, string poisonMessageQueueName, TransportDefinition transport, 
+        Func<MessageContext, IMessageDispatcher, CancellationToken, Task> onMessage, PoisonMessageHandling poisonMessageHandling, int? maximumConcurrency, 
         int immediateRetries, int delayedRetries, int circuitBreakerThreshold)
     {
         var switchedBack = false;
-        var throttledConfig = RawEndpointConfiguration.Create(inputQueue, async (context, dispatcher) =>
+        var throttledConfig = RawEndpointConfiguration.Create(inputQueue, transport, async (context, dispatcher, token) =>
         {
-            await onMessage(context, dispatcher);
+            await onMessage(context, dispatcher, token);
             if (switchedBack)
             {
                 return;
@@ -109,7 +109,7 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
                 try
                 {
                     var oldEndpoint = endpoint;
-                    var regularConfig = PrepareConfig(inputQueue, poisonMessageQueueName, transportCustomization, onMessage, poisonMessageHandling, maximumConcurrency, immediateRetries, delayedRetries, circuitBreakerThreshold, false, null);
+                    var regularConfig = PrepareConfig(inputQueue, poisonMessageQueueName, transport, onMessage, poisonMessageHandling, maximumConcurrency, immediateRetries, delayedRetries, circuitBreakerThreshold, false);
                     var newEndpoint = await RawEndpoint.Start(regularConfig).ConfigureAwait(false);
                     endpoint = newEndpoint;
                     await oldEndpoint.Stop().ConfigureAwait(false);
@@ -128,16 +128,14 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
 
         throttledConfig.CustomErrorHandlingPolicy(new ThrottledModePolicy(inputQueue, immediateRetries));
 
-        Task onCriticalError(ICriticalErrorContext context)
+        Task onCriticalError(ICriticalErrorContext context, CancellationToken token)
         {
             logger.Fatal($"The receiver for queue {inputQueue} has encountered a severe error that is likely related to the connectivity with the broker or the broker itself.");
             return Task.CompletedTask;
         }
 
-        throttledConfig.Settings.Set("onCriticalErrorAction", (Func<ICriticalErrorContext, Task>)onCriticalError);
+        throttledConfig.CriticalErrorAction(onCriticalError);
 
-        var transport = throttledConfig.UseTransport<T>();
-        transportCustomization(transport);
         throttledConfig.LimitMessageProcessingConcurrencyTo(1);
         return throttledConfig;
     }
@@ -145,75 +143,62 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
     public async Task<IStartableRawEndpoint> Create()
     {
         startable = await RawEndpoint.Create(config);
-        ValidateTransactionMode(startable);
         config = null;
         return this;
     }
 
-    static void ValidateTransactionMode(IStartableRawEndpoint startableRawEndpoint)
+    async Task<IReceivingRawEndpoint> IStartableRawEndpoint.Start(CancellationToken cancellationToken)
     {
-        var infra = startableRawEndpoint.Settings.Get<TransportInfrastructure>();
-
-        if (startableRawEndpoint.Settings.TryGet<TransportTransactionMode>(out var selectedMode))
-        {
-            if (selectedMode == TransportTransactionMode.SendsAtomicWithReceive)
-            {
-                throw new Exception("Router cannot operate in SendsAtomicWithReceive transaction mode. Please select other transaction mode.");
-            }
-        }
-        else if (infra.TransactionMode == TransportTransactionMode.SendsAtomicWithReceive)
-        {
-            throw new Exception($"{infra.GetType()} defaults to SendsAtomicWithReceive transaction mode. Router cannot operate in that mode. Customize the transport configuration to use SendsAtomicWithReceive mode.");
-        }
-    }
-
-    async Task<IReceivingRawEndpoint> IStartableRawEndpoint.Start()
-    {
-        endpoint = await startable.Start().ConfigureAwait(false);
+        endpoint = await startable.Start(cancellationToken).ConfigureAwait(false);
         startable = null;
         return this;
     }
 
-    async Task<IStoppableRawEndpoint> IReceivingRawEndpoint.StopReceiving()
+    async Task<IStoppableRawEndpoint> IReceivingRawEndpoint.StopReceiving(CancellationToken cancellationToken)
     {
-        await transitionSemaphore.WaitAsync().ConfigureAwait(false);
+        await transitionSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         if (endpoint != null)
         {
-            stoppable = await endpoint.StopReceiving().ConfigureAwait(false);
+            stoppable = await endpoint.StopReceiving(cancellationToken).ConfigureAwait(false);
             endpoint = null;
         }
         return this;
     }
 
-    async Task IStoppableRawEndpoint.Stop()
+    async Task IStoppableRawEndpoint.Stop(CancellationToken cancellationToken)
     {
         if (stoppable != null)
         {
-            await stoppable.Stop().ConfigureAwait(false);
+            await stoppable.Stop(cancellationToken).ConfigureAwait(false);
             stoppable = null;
         }
     }
 
-    string IRawEndpoint.ToTransportAddress(LogicalAddress logicalAddress) => startable?.ToTransportAddress(logicalAddress) ?? endpoint.ToTransportAddress(logicalAddress);
+    string IRawEndpoint.ToTransportAddress(QueueAddress queueAddress) => startable?.ToTransportAddress(queueAddress) ?? endpoint.ToTransportAddress(queueAddress);
 
-    Task IDispatchMessages.Dispatch(TransportOperations outgoingMessages, TransportTransaction transaction, ContextBag context)
+    Task IMessageDispatcher.Dispatch(TransportOperations outgoingMessages, TransportTransaction transaction, CancellationToken cancellationToken)
     {
         return endpoint != null 
-            ? endpoint.Dispatch(outgoingMessages, transaction, context) 
-            : startable.Dispatch(outgoingMessages, transaction, context);
+            ? endpoint.Dispatch(outgoingMessages, transaction, cancellationToken) 
+            : startable.Dispatch(outgoingMessages, transaction, cancellationToken);
     }
 
     string IRawEndpoint.TransportAddress => startable?.TransportAddress ?? endpoint.TransportAddress;
     string IRawEndpoint.EndpointName => startable?.EndpointName ?? endpoint.EndpointName;
-    ReadOnlySettings IRawEndpoint.Settings => startable?.Settings ?? endpoint.Settings;
-    public IManageSubscriptions SubscriptionManager => startable?.SubscriptionManager ?? endpoint.SubscriptionManager;
+    public ISubscriptionManager SubscriptionManager
+    {
+        get
+        {
+            return endpoint?.SubscriptionManager ?? startable?.SubscriptionManager;
+        }
+    }
 
     RawEndpointConfiguration config;
     IReceivingRawEndpoint endpoint;
     IStartableRawEndpoint startable;
     SemaphoreSlim transitionSemaphore = new SemaphoreSlim(1);
 
-    static ILog logger = LogManager.GetLogger(typeof(ThrottlingRawEndpointConfig<T>));
+    static ILog logger = LogManager.GetLogger(typeof(ThrottlingRawEndpointConfig));
     IStoppableRawEndpoint stoppable;
 
     class RegularModePolicy : IErrorHandlingPolicy
@@ -233,7 +218,7 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
             this.delayedRetries = delayedRetries;
         }
 
-        public async Task<ErrorHandleResult> OnError(IErrorHandlingPolicyContext handlingContext, IDispatchMessages dispatcher)
+        public async Task<ErrorHandleResult> OnError(IErrorHandlingPolicyContext handlingContext, IMessageDispatcher dispatcher, CancellationToken cancellationToken = default)
         {
             if (handlingContext.Error.Exception is UnforwardableMessageException)
             {
@@ -264,7 +249,7 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
                 var newDelayedRetriesHeaderValue = handlingContext.Error.DelayedDeliveriesPerformed + 1;
                 incomingMessage.Headers[Headers.DelayedRetries] = newDelayedRetriesHeaderValue.ToString();
             }
-            await dispatcher.Dispatch(new TransportOperations(operation), handlingContext.Error.TransportTransaction, new ContextBag())
+            await dispatcher.Dispatch(new TransportOperations(operation), handlingContext.Error.TransportTransaction, cancellationToken)
                 .ConfigureAwait(false);
 
             //Notify the circuit breaker
@@ -285,7 +270,7 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
             this.immediateRetries = immediateRetries;
         }
 
-        public async Task<ErrorHandleResult> OnError(IErrorHandlingPolicyContext handlingContext, IDispatchMessages dispatcher)
+        public async Task<ErrorHandleResult> OnError(IErrorHandlingPolicyContext handlingContext, IMessageDispatcher dispatcher, CancellationToken cancellationToken = default)
         {
             await Task.Delay(1000);
             if (handlingContext.Error.ImmediateProcessingFailures < immediateRetries)
@@ -300,7 +285,7 @@ class ThrottlingRawEndpointConfig<T> : IStartableRawEndpoint, IReceivingRawEndpo
             var message = new OutgoingMessage(incomingMessage.MessageId, incomingMessage.Headers, incomingMessage.Body);
             var operation = new TransportOperation(message, new UnicastAddressTag(inputQueue));
 
-            await dispatcher.Dispatch(new TransportOperations(operation), handlingContext.Error.TransportTransaction, new ContextBag())
+            await dispatcher.Dispatch(new TransportOperations(operation), handlingContext.Error.TransportTransaction, cancellationToken)
                 .ConfigureAwait(false);
 
             return ErrorHandleResult.Handled;

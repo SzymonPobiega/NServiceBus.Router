@@ -1,6 +1,5 @@
 ﻿namespace NServiceBus.AcceptanceTesting.Support
 {
-    using System;
     using System.Threading.Tasks;
 
     /// <summary>
@@ -9,8 +8,7 @@
     /// </summary>
     public interface IConfigureEndpointTestExecution
     {
-        Action<TransportExtensions> ConfigureTransport { get; set; }
-            /// <summary>
+        /// <summary>
         /// Gives the transport/persistence a chance to configure before the test starts.
         /// </summary>
         /// <param name="endpointName">The endpoint name.</param>

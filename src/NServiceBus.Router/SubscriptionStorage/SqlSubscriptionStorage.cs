@@ -5,6 +5,7 @@
     using System.Collections.Generic;
     using System.Data.Common;
     using System.Linq;
+    using System.Threading;
     using System.Threading.Tasks;
     using Extensibility;
     using Logging;
@@ -87,7 +88,7 @@
         /// <summary>
         /// Subscribes the given client to messages of a given type.
         /// </summary>
-        public async Task Subscribe(Subscriber subscriber, MessageType messageType, ContextBag context)
+        public async Task Subscribe(Subscriber subscriber, MessageType messageType, ContextBag context, CancellationToken cancellationToken = default)
         {
             await Retry(async () =>
             {
@@ -108,7 +109,7 @@
         /// <summary>
         /// Unsubscribes the given client from messages of given type.
         /// </summary>
-        public async Task Unsubscribe(Subscriber subscriber, MessageType messageType, ContextBag context)
+        public async Task Unsubscribe(Subscriber subscriber, MessageType messageType, ContextBag context, CancellationToken cancellationToken = default)
         {
             await Retry(async () =>
             {
@@ -127,7 +128,7 @@
         /// <summary>
         /// Returns a list of addresses for subscribers currently subscribed to the given message type.
         /// </summary>
-        public Task<IEnumerable<Subscriber>> GetSubscriberAddressesForMessage(IEnumerable<MessageType> messageHierarchy, ContextBag context)
+        public Task<IEnumerable<Subscriber>> GetSubscriberAddressesForMessage(IEnumerable<MessageType> messageHierarchy, ContextBag context, CancellationToken cancellationToken = default)
         {
             var types = messageHierarchy.ToList();
 

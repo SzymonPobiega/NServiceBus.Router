@@ -2,6 +2,7 @@ namespace NServiceBus.Router
 {
     using System;
     using System.Linq;
+    using Transport;
 
     /// <summary>
     /// Allows creating routers.
@@ -76,9 +77,9 @@ namespace NServiceBus.Router
             chains.AddRule(c => new ReplyReplyTraceRule(c.Endpoint.TransportAddress, c.Endpoint.EndpointName));
 
             chains.AddChain(cb => cb.Begin<AnycastContext>().AddSection<PostroutingContext>().Terminate());
-            chains.AddRule(c => new AnycastToPostroutingConnector(c.EndpointInstances, c.DistributionPolicy, instance => c.Endpoint.ToTransportAddress(LogicalAddress.CreateRemoteAddress(instance))));
+            chains.AddRule(c => new AnycastToPostroutingConnector(c.EndpointInstances, c.DistributionPolicy, instance => c.Endpoint.ToTransportAddress(new QueueAddress(instance.Endpoint, instance.Discriminator, instance.Properties))));
             chains.AddChain(cb => cb.Begin<MulticastContext>().AddSection<PostroutingContext>().Terminate());
-            chains.AddRule(c => new MulticastToPostroutingConnector(c.EndpointInstances, instance => c.Endpoint.ToTransportAddress(LogicalAddress.CreateRemoteAddress(instance))));
+            chains.AddRule(c => new MulticastToPostroutingConnector(c.EndpointInstances, instance => c.Endpoint.ToTransportAddress(new QueueAddress(instance.Endpoint, instance.Discriminator, instance.Properties))));
             chains.AddChain(cb => cb.Begin<PostroutingContext>().Terminate());
             chains.AddRule(c => new PostroutingTerminator(c.Endpoint));
 

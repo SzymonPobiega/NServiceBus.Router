@@ -1,7 +1,5 @@
 ﻿using System.Threading.Tasks;
 using NServiceBus.AcceptanceTesting;
-using NServiceBus.AcceptanceTests;
-using NServiceBus.AcceptanceTests.EndpointTemplates;
 using NUnit.Framework;
 
 namespace NServiceBus.Router.AcceptanceTests.SingleRouter
@@ -19,13 +17,16 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
                 {
-                    cfg.AddInterface<TestTransport>("B", t => t.BrokerYankee()).LimitMessageProcessingConcurrencyTo(1);
+                    var b = cfg.AddInterface("B");
+                    b.LimitMessageProcessingConcurrencyTo(1);
+                    b.Broker().Yankee();
 
                     //BaseEventSubscriber - Broker A
-                    cfg.AddInterface<TestTransport>("A", t => t.BrokerAlpha()).InMemorySubscriptions();
+                    var a = cfg.AddInterface("A", false);
+                    a.Broker().Alpha();
 
                     //DerivedEventSubscriber - Broker C`
-                    cfg.AddInterface<TestTransport>("C", t => t.BrokerZulu());
+                    cfg.AddInterface("C").Broker().Zulu();
 
                     var routeTable = cfg.UseStaticRoutingProtocol();
                     routeTable.AddForwardRoute("A", "B");
@@ -64,7 +65,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 EndpointSetup<DefaultServer>(c =>
                 {
                     //No bridge configuration needed for publisher
-                    c.UseTransport<TestTransport>().BrokerYankee();
+                    c.ConfigureBroker().Yankee();
                 });
             }
 
@@ -98,7 +99,8 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    var routing = c.UseTransport<TestTransport>().BrokerAlpha().Routing();
+                    c.ConfigureBroker().Alpha();
+                    var routing = c.ConfigureRouting();
                     var bridge = routing.ConnectToRouter("Router");
                     bridge.RegisterPublisher(typeof(MyBaseEvent3), PublisherEndpoint);
                     bridge.RouteToEndpoint(typeof(TracerMessage), PublisherEndpoint);
@@ -128,8 +130,9 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    var routing = c.UseTransport<TestTransport>().BrokerZulu()
-                        .Routing();
+                    c.ConfigureBroker().Zulu();
+
+                    var routing = c.ConfigureRouting();
 
                     var bridge = routing.ConnectToRouter("Router");
                     bridge.RegisterPublisher(typeof(MyDerivedEvent3), PublisherEndpoint);

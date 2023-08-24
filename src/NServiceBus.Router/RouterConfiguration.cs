@@ -32,13 +32,11 @@ namespace NServiceBus.Router
         /// <summary>
         /// Adds a new interface to the router.
         /// </summary>
-        /// <typeparam name="T">Transport to use for this interface.</typeparam>
         /// <param name="name">Name of the interface.</param>
-        /// <param name="customization">A callback for customizing the transport settings.</param>
-        public InterfaceConfiguration<T> AddInterface<T>(string name, Action<TransportExtensions<T>> customization)
-            where T : TransportDefinition, new()
+        /// <param name="transport">Transport to use for this interface.</param>
+        public InterfaceConfiguration AddInterface(string name, TransportDefinition transport)
         {
-            var ifaceConfig = new InterfaceConfiguration<T>(name, customization, this);
+            var ifaceConfig = new InterfaceConfiguration(name, transport, this);
             InterfaceFactories.Add(() => CreateInterface(ifaceConfig));
             return ifaceConfig;
         }
@@ -46,36 +44,31 @@ namespace NServiceBus.Router
         /// <summary>
         /// Adds a new send-only interface to the router.
         /// </summary>
-        /// <typeparam name="T">Transport to use for this interface.</typeparam>
         /// <param name="name">Name of the interface.</param>
-        /// <param name="customization">A callback for customizing the transport settings.</param>
-        public SendOnlyInterfaceConfiguration<T> AddSendOnlyInterface<T>(string name, Action<TransportExtensions<T>> customization)
-            where T : TransportDefinition, new()
+        /// <param name="transport">Transport to use for this interface.</param>
+        public SendOnlyInterfaceConfiguration AddSendOnlyInterface(string name, TransportDefinition transport)
         {
-            var ifaceConfig = new SendOnlyInterfaceConfiguration<T>(name, customization, this);
+            var ifaceConfig = new SendOnlyInterfaceConfiguration(name, transport, this);
             SendOnlyInterfaceFactories.Add(() => CreateSendOnlyInterface(ifaceConfig));
             return ifaceConfig;
         }
 
-        SendOnlyInterface CreateSendOnlyInterface<T>(SendOnlyInterfaceConfiguration<T> ifaceConfig)
-            where T : TransportDefinition, new()
+        SendOnlyInterface CreateSendOnlyInterface(SendOnlyInterfaceConfiguration ifaceConfig)
         {
             return ifaceConfig.Create(Name, typeGenerator, Settings);
         }
 
-        Interface CreateInterface<T>(InterfaceConfiguration<T> ifaceConfig) where T : TransportDefinition, new()
+        Interface CreateInterface(InterfaceConfiguration ifaceConfig)
         {
-            return ifaceConfig.Create(Name, PoisonQueueName, autoCreateQueues, autoCreateQueuesIdentity, ImmediateRetries, DelayedRetries, CircuitBreakerThreshold, typeGenerator, Settings);
+            return ifaceConfig.Create(Name, PoisonQueueName, autoCreateQueues, ImmediateRetries, DelayedRetries, CircuitBreakerThreshold, typeGenerator, Settings);
         }
 
         /// <summary>
         /// Configures the router to automatically create a queue when starting up.
         /// </summary>
-        /// <param name="identity">Identity to use when creating the queue.</param>
-        public void AutoCreateQueues(string identity = null)
+        public void AutoCreateQueues()
         {
             autoCreateQueues = true;
-            autoCreateQueuesIdentity = identity;
         }
 
         /// <summary>
@@ -146,7 +139,6 @@ namespace NServiceBus.Router
         }
 
         bool? autoCreateQueues;
-        string autoCreateQueuesIdentity;
         internal List<Func<Interface>> InterfaceFactories = new List<Func<Interface>>();
         internal List<Func<SendOnlyInterface>> SendOnlyInterfaceFactories = new List<Func<SendOnlyInterface>>();
         internal List<IModule> Modules = new List<IModule>();

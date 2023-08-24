@@ -7,7 +7,7 @@ class PreroutingToPublishPreroutingFork : IRule<PreroutingContext, PreroutingCon
 {
     public async Task Invoke(PreroutingContext context, Func<PreroutingContext, Task> next)
     {
-        if (context.Intent == MessageIntentEnum.Publish)
+        if (context.Intent == MessageIntent.Publish)
         {
             if (!context.Headers.TryGetValue(Headers.EnclosedMessageTypes, out var messageTypes))
             {

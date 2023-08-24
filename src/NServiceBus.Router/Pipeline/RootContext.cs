@@ -2,14 +2,17 @@
 
 namespace NServiceBus.Router
 {
+    using System.Threading;
+
     /// <summary>
     /// Root context for the router.
     /// </summary>
     public class RootContext : ContextBag, IRuleContext
     {
-        internal RootContext(IInterfaceChains interfaces, string routerName)
+        internal RootContext(IInterfaceChains interfaces, string routerName, CancellationToken cancellationToken)
         {
             RouterName = routerName;
+            CancellationToken = cancellationToken;
             Set(interfaces);
         }
 
@@ -27,6 +30,11 @@ namespace NServiceBus.Router
         /// Allows extending the rule context by adding arbitrary values.
         /// </summary>
         public ContextBag Extensions => this;
+
+        /// <summary>
+        /// Cancellation token for graceful shutdown
+        /// </summary>
+        public CancellationToken CancellationToken { get; }
     }
 }
 

@@ -1,15 +1,14 @@
 ﻿using NServiceBus.Router;
-using NServiceBus.Transport;
 
 public static class SubscriptionHelper
 {
-    public static InterfaceConfiguration<T> InMemorySubscriptions<T>(this InterfaceConfiguration<T> interfaceConfig) where T : TransportDefinition, new()
+    public static InterfaceConfiguration InMemorySubscriptions(this InterfaceConfiguration interfaceConfig)
     {
         interfaceConfig.EnableMessageDrivenPublishSubscribe(new InMemorySubscriptionStorage());
         return interfaceConfig;
     }
 
-    public static SendOnlyInterfaceConfiguration<T> InMemorySubscriptions<T>(this SendOnlyInterfaceConfiguration<T> interfaceConfig) where T : TransportDefinition, new()
+    public static SendOnlyInterfaceConfiguration InMemorySubscriptions(this SendOnlyInterfaceConfiguration interfaceConfig)
     {
         interfaceConfig.EnableMessageDrivenPublishSubscribe(new InMemorySubscriptionStorage());
         return interfaceConfig;

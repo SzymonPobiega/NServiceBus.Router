@@ -1,7 +1,5 @@
 ﻿using System.Threading.Tasks;
 using NServiceBus.AcceptanceTesting;
-using NServiceBus.AcceptanceTests;
-using NServiceBus.AcceptanceTests.EndpointTemplates;
 using NUnit.Framework;
 
 namespace NServiceBus.Router.AcceptanceTests.SingleRouter
@@ -17,10 +15,11 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
                 {
-                    cfg.AddInterface<TestTransport>("Red", t => t.BrokerAlpha()).InMemorySubscriptions();
-                    cfg.AddInterface<TestTransport>("Green", t => t.BrokerBravo()).InMemorySubscriptions();
+                    cfg.AddInterface("Red", false).Broker().Alpha();
+                    cfg.AddInterface("Green", false).Broker().Bravo();
+                    
                     //Charlie broker is not interested in the event
-                    cfg.AddInterface<TestTransport>("Blue", t => t.BrokerCharlie()).InMemorySubscriptions();
+                    cfg.AddInterface("Blue", false).Broker().Charlie();
 
                     cfg.UseStaticRoutingProtocol().AddForwardRoute("Green", "Red");
                 })
@@ -45,7 +44,9 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 EndpointSetup<DefaultServer>(c =>
                 {
                     //No bridge configuration needed for publisher
-                    c.UseTransport<TestTransport>().BrokerAlpha();
+                    c.ConfigureBroker().Alpha();
+                    c.ConfigureRouting().EnableMessageDrivenPubSubCompatibilityMode();
+
                     c.OnEndpointSubscribed<Context>((args, context) =>
                     {
                         context.EventSubscribed = true;
@@ -60,7 +61,10 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    var routing = c.UseTransport<TestTransport>().BrokerBravo().Routing();
+                    c.ConfigureBroker().Bravo();
+                    c.ConfigureRouting().EnableMessageDrivenPubSubCompatibilityMode();
+
+                    var routing = c.ConfigureRouting();
                     var bridge = routing.ConnectToRouter("Router");
                     bridge.RegisterPublisher(typeof(MyEvent), Conventions.EndpointNamingConvention(typeof(Publisher)));
                 });

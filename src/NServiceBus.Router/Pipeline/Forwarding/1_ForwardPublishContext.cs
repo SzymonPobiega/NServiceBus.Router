@@ -40,7 +40,7 @@
         /// <summary>
         /// The headers associated with the received message.
         /// </summary>
-        public byte[] ReceivedBody { get; }
+        public ReadOnlyMemory<byte> ReceivedBody { get; }
 
         /// <summary>
         /// Mark this message as forwarded.

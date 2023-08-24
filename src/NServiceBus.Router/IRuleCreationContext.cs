@@ -36,6 +36,6 @@
         /// <summary>
         /// Settings for the interface merged with router-wide settings.
         /// </summary>
-        ReadOnlySettings Settings { get; }
+        IReadOnlySettings Settings { get; }
     }
 }

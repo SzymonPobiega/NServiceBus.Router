@@ -1,7 +1,5 @@
 ﻿using System.Threading.Tasks;
 using NServiceBus.AcceptanceTesting;
-using NServiceBus.AcceptanceTests;
-using NServiceBus.AcceptanceTests.EndpointTemplates;
 using NUnit.Framework;
 
 namespace NServiceBus.Router.AcceptanceTests.SingleRouter
@@ -20,8 +18,9 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
                 {
-                    var leftIface = cfg.AddInterface<TestTransport>("Left", t => t.BrokerAlpha()).InMemorySubscriptions();
-                    cfg.AddInterface<TestTransport>("Right", t => t.BrokerBravo()).InMemorySubscriptions();
+                    var leftIface = cfg.AddInterface("Left", false);
+                    leftIface.Broker().Alpha();
+                    cfg.AddInterface("Right", false).Broker().Bravo();
                     cfg.UseStaticRoutingProtocol().AddForwardRoute("Right", "Left");
 
                     leftIface.EndpointInstances.AddOrReplaceInstances("publishers", new List<EndpointInstance>
@@ -53,7 +52,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    c.UseTransport<TestTransport>().BrokerAlpha();
+                    c.ConfigureBroker().Alpha();
                     c.MakeInstanceUniquelyAddressable("A");
                     c.OnEndpointSubscribed<Context>((args, context) =>
                     {
@@ -69,7 +68,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    c.UseTransport<TestTransport>().BrokerAlpha();
+                    c.ConfigureBroker().Alpha();
                     c.MakeInstanceUniquelyAddressable("B");
                     c.OnEndpointSubscribed<Context>((args, context) =>
                     {
@@ -85,7 +84,9 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    var routing = c.UseTransport<TestTransport>().BrokerBravo().Routing();
+                    c.ConfigureBroker().Bravo();
+
+                    var routing = c.ConfigureRouting();
                     var bridge = routing.ConnectToRouter("Router");
                     bridge.RegisterPublisher(typeof(MyEvent), PublisherEndpointName);
                 });

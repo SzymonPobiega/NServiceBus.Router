@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using NServiceBus;
 using NServiceBus.Logging;
@@ -10,7 +9,7 @@ using NServiceBus.Unicast.Transport;
 
 class RouterUnsubscribeBehavior : Behavior<IUnsubscribeContext>
 {
-    public RouterUnsubscribeBehavior(string subscriberAddress, string subscriberEndpoint, IDispatchMessages dispatcher, CompiledRouterConnectionSettings compiledSettings, bool invokeTerminator)
+    public RouterUnsubscribeBehavior(string subscriberAddress, string subscriberEndpoint, IMessageDispatcher dispatcher, CompiledRouterConnectionSettings compiledSettings, bool invokeTerminator)
     {
         this.subscriberAddress = subscriberAddress;
         this.subscriberEndpoint = subscriberEndpoint;
@@ -26,19 +25,19 @@ class RouterUnsubscribeBehavior : Behavior<IUnsubscribeContext>
         {
             Logger.Debug($"Sending unsubscribe request for {eventType.AssemblyQualifiedName} to router queue {publisherInfo.Router} to be forwarded to {publisherInfo.Endpoint}");
 
-            var subscriptionMessage = ControlMessageFactory.Create(MessageIntentEnum.Unsubscribe);
+            var subscriptionMessage = ControlMessageFactory.Create(MessageIntent.Unsubscribe);
 
             subscriptionMessage.Headers[Headers.SubscriptionMessageType] = eventType.AssemblyQualifiedName;
             subscriptionMessage.Headers[Headers.ReplyToAddress] = subscriberAddress;
             subscriptionMessage.Headers[Headers.SubscriberTransportAddress] = subscriberAddress;
             subscriptionMessage.Headers[Headers.SubscriberEndpoint] = subscriberEndpoint;
             subscriptionMessage.Headers["NServiceBus.Bridge.DestinationEndpoint"] = publisherInfo.Endpoint;
-            subscriptionMessage.Headers[Headers.TimeSent] = DateTimeExtensions.ToWireFormattedString(DateTime.UtcNow);
+            subscriptionMessage.Headers[Headers.TimeSent] = DateTimeOffsetHelper.ToWireFormattedString(DateTime.UtcNow);
             subscriptionMessage.Headers[Headers.NServiceBusVersion] = "6.3.1"; //The code has been copied from 6.3.1
 
             var transportOperation = new TransportOperation(subscriptionMessage, new UnicastAddressTag(publisherInfo.Router));
             var transportTransaction = context.Extensions.GetOrCreate<TransportTransaction>();
-            await dispatcher.Dispatch(new TransportOperations(transportOperation), transportTransaction, context.Extensions).ConfigureAwait(false);
+            await dispatcher.Dispatch(new TransportOperations(transportOperation), transportTransaction, context.CancellationToken).ConfigureAwait(false);
 
             if (invokeTerminator)
             {
@@ -51,7 +50,7 @@ class RouterUnsubscribeBehavior : Behavior<IUnsubscribeContext>
         }
     }
 
-    IDispatchMessages dispatcher;
+    IMessageDispatcher dispatcher;
     readonly CompiledRouterConnectionSettings compiledSettings;
     bool invokeTerminator;
     string subscriberAddress;

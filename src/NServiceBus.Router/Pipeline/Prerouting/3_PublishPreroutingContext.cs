@@ -1,5 +1,7 @@
 ﻿namespace NServiceBus.Router
 {
+    using System;
+
     /// <summary>
     /// Defines the context for the third part of the prerouting chain group -- the prerouting chain for publish messages.
     /// </summary>
@@ -22,6 +24,6 @@
         /// <summary>
         /// The body of the received message.
         /// </summary>
-        public byte[] Body { get; }
+        public ReadOnlyMemory<byte> Body { get; }
     }
 }

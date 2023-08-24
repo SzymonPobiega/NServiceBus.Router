@@ -4,18 +4,13 @@
     using Raw;
     using Routing;
     using Transport;
-    using Unicast.Subscriptions.MessageDrivenSubscriptions;
 
     /// <summary>
     /// Configures the switch port.
     /// </summary>
-    /// <typeparam name="T">Type of transport.</typeparam>
-    public class InterfaceConfiguration<T>
-        where T : TransportDefinition, new()
+    public class InterfaceConfiguration
     {
-        Action<TransportExtensions<T>> customization;
         bool? autoCreateQueues;
-        string autoCreateQueuesIdentity;
         int? maximumConcurrency;
         string overriddenEndpointName;
 
@@ -34,10 +29,16 @@
         /// </summary>
         public RouterConfiguration RouterConfiguration { get; }
 
-        internal InterfaceConfiguration(string name, Action<TransportExtensions<T>> customization, RouterConfiguration routerConfiguration)
+        /// <summary>
+        /// Transport used by this interface.
+        /// </summary>
+        public TransportDefinition Transport { get; }
+
+
+        internal InterfaceConfiguration(string name, TransportDefinition transport, RouterConfiguration routerConfiguration)
         {
+            this.Transport = transport;
             Name = name;
-            this.customization = customization;
             RouterConfiguration = routerConfiguration;
         }
 
@@ -61,22 +62,11 @@
         }
 
         /// <summary>
-        /// Configures the port to use specified subscription persistence.
-        /// </summary>
-        [Obsolete("Use EnableMessageDrivenPublishSubscribe instead.")]
-        public void UseSubscriptionPersistence(ISubscriptionStorage subscriptionStorage)
-        {
-            this.EnableMessageDrivenPublishSubscribe(subscriptionStorage);
-        }
-
-        /// <summary>
         /// Configures the port to automatically create a queue when starting up. Overrides switch-level setting.
         /// </summary>
-        /// <param name="identity">Identity to use when creating the queue.</param>
-        public void AutoCreateQueues(string identity = null)
+        public void AutoCreateQueues()
         {
             autoCreateQueues = true;
-            autoCreateQueuesIdentity = identity;
         }
 
         /// <summary>
@@ -107,7 +97,7 @@
         /// </summary>
         public EndpointInstances EndpointInstances { get; } = new EndpointInstances();
 
-        internal Interface Create(string endpointName, string poisonQueue, bool? routerAutoCreateQueues, string routerAutoCreateQueuesIdentity, int immediateRetries, int delayedRetries, int circuitBreakerThreshold, RuntimeTypeGenerator typeGenerator, SettingsHolder routerSettings)
+        internal Interface Create(string endpointName, string poisonQueue, bool? routerAutoCreateQueues, int immediateRetries, int delayedRetries, int circuitBreakerThreshold, RuntimeTypeGenerator typeGenerator, SettingsHolder routerSettings)
         {
             IRuleCreationContext ContextFactory(IRawEndpoint e)
             {
@@ -115,7 +105,7 @@
                 return new RuleCreationContext(Name, EndpointInstances, DistributionPolicy, e, typeGenerator, Settings);
             }
 
-            return new Interface<T>(overriddenEndpointName ?? endpointName, Name, customization, ContextFactory, poisonQueue, maximumConcurrency, autoCreateQueues ?? routerAutoCreateQueues ?? false, autoCreateQueuesIdentity ?? routerAutoCreateQueuesIdentity, immediateRetries, delayedRetries, circuitBreakerThreshold);
+            return new Interface(overriddenEndpointName ?? endpointName, Name, Transport, ContextFactory, poisonQueue, maximumConcurrency, autoCreateQueues ?? routerAutoCreateQueues ?? false, immediateRetries, delayedRetries, circuitBreakerThreshold);
         }
     }
 }

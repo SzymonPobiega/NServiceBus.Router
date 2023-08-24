@@ -1,13 +1,9 @@
 ﻿using System.Threading.Tasks;
 using NServiceBus.AcceptanceTesting;
-using NServiceBus.AcceptanceTests;
-using NServiceBus.AcceptanceTests.EndpointTemplates;
 using NUnit.Framework;
 
 namespace NServiceBus.Router.AcceptanceTests.SingleRouter
 {
-    using InMemoryPersistence = global::InMemoryPersistence;
-
     [TestFixture]
     public class When_publishing_from_native_pubsub_endpoint_auto : NServiceBusAcceptanceTest
     {
@@ -19,9 +15,11 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
                 {
-                    cfg.AddInterface<TestTransport>("A", t => t.BrokerZulu());
-                    cfg.AddInterface<TestTransport>("B", t => t.BrokerYankee());
-                    cfg.AddInterface<TestTransport>("C", t => t.BrokerAlpha()).EnableMessageDrivenPublishSubscribe(alphaSubscriptionStore);
+                    cfg.AddInterface("A").Broker().Zulu();
+                    cfg.AddInterface("B").Broker().Yankee();
+                    var c = cfg.AddInterface("C", false);
+                    c.Broker().Alpha();
+                    c.EnableMessageDrivenPublishSubscribe(alphaSubscriptionStore);
 
                     cfg.UseStaticRoutingProtocol();
                 })
@@ -62,7 +60,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 EndpointSetup<DefaultServer>(c =>
                 {
                     //No bridge configuration needed for publisher
-                    c.UseTransport<TestTransport>().BrokerZulu();
+                    c.ConfigureBroker().Zulu();
                 });
             }
         }
@@ -73,8 +71,9 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    var routing = c.UseTransport<TestTransport>().BrokerYankee()
-                        .Routing();
+                    c.ConfigureBroker().Yankee();
+
+                    var routing = c.ConfigureRouting();
 
                     routing.ConnectToRouter("Router", true, false);
                 });
@@ -103,8 +102,9 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    var routing = c.UseTransport<TestTransport>().BrokerAlpha()
-                        .Routing();
+                    c.ConfigureBroker().Alpha();
+
+                    var routing = c.ConfigureRouting();
 
                     routing.ConnectToRouter("Router", true, false);
                 });

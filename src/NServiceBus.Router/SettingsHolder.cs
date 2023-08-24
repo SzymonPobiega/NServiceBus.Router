@@ -8,7 +8,7 @@
     /// <summary>
     /// Setting container.
     /// </summary>
-    public class SettingsHolder : ReadOnlySettings
+    public class SettingsHolder : IReadOnlySettings
     {
         /// <summary>
         /// Gets the given setting by key.

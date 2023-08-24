@@ -1,37 +1,21 @@
 using System;
 using System.Threading.Tasks;
-using NServiceBus;
 using NServiceBus.Router;
-using NServiceBus.Configuration.AdvancedExtensibility;
 using NServiceBus.Raw;
 using NServiceBus.Transport;
 
-interface SendOnlyInterface
-{
-    string Name { get; }
-    Task Initialize(InterfaceChains interfaces);
-    Task Stop();
-}
 
-class SendOnlyInterface<T> : SendOnlyInterface where T : TransportDefinition, new()
+class SendOnlyInterface
 {
-    public SendOnlyInterface(string endpointName, string interfaceName, Action<TransportExtensions<T>> transportCustomization, Func<IRawEndpoint, IRuleCreationContext> ruleCreationContextFactory)
+    public SendOnlyInterface(string endpointName, string interfaceName, TransportDefinition transport, Func<IRawEndpoint, IRuleCreationContext> ruleCreationContextFactory)
     {
         this.ruleCreationContextFactory = ruleCreationContextFactory;
         Name = interfaceName;
 
-        config = RawEndpointConfiguration.CreateSendOnly(endpointName);
-        var transport = config.UseTransport<T>();
-        SetTransportSpecificFlags(transport.GetSettings());
-        transportCustomization?.Invoke(transport);
+        config = RawEndpointConfiguration.CreateSendOnly(endpointName, transport);
     }
 
     public string Name { get; }
-
-    static void SetTransportSpecificFlags(NServiceBus.Settings.SettingsHolder settings)
-    {
-        settings.Set("RabbitMQ.RoutingTopologySupportsDelayedDelivery", true);
-    }
 
     public async Task Initialize(InterfaceChains interfaces)
     {

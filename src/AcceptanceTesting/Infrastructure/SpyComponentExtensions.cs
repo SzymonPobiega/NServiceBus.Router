@@ -1,17 +1,16 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using NServiceBus;
 using NServiceBus.AcceptanceTesting;
 using NServiceBus.AcceptanceTesting.Support;
 using NServiceBus.Transport;
 
 public static class SpyComponentExtensions
 {
-    public static IScenarioWithEndpointBehavior<TContext> WithPosionSpyComponent<TContext>(this IScenarioWithEndpointBehavior<TContext> scenario, Action<TransportExtensions<TestTransport>> transportConfiguration)
+    public static IScenarioWithEndpointBehavior<TContext> WithPosionSpyComponent<TContext>(this IScenarioWithEndpointBehavior<TContext> scenario, TransportDefinition transportConfiguration)
         where TContext : ScenarioContext, IPoisonSpyContext
     {
-        return scenario.WithComponent(new SpyComponent<TContext>("poison", transportConfiguration, (scenarioContext, messageContext, dispatcher) =>
+        return scenario.WithComponent(new SpyComponent<TContext>("poison", transportConfiguration, (scenarioContext, messageContext, dispatcher, token) =>
         {
             var failureDetected = 0;
 
@@ -29,8 +28,8 @@ public static class SpyComponentExtensions
 
     public static IScenarioWithEndpointBehavior<TContext> WithSpyComponent<TContext>(this IScenarioWithEndpointBehavior<TContext> scenario,
         string endpointName,
-        Action<TransportExtensions<TestTransport>> transportConfiguration,
-        Func<TContext, MessageContext, IDispatchMessages, Task> onMessage)
+        TransportDefinition transportConfiguration,
+        Func<TContext, MessageContext, IMessageDispatcher, CancellationToken, Task> onMessage)
         where TContext : ScenarioContext
     {
         return scenario.WithComponent(new SpyComponent<TContext>(endpointName, transportConfiguration, onMessage));

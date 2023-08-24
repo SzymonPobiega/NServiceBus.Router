@@ -16,7 +16,7 @@
         /// <param name="destinationRouter">Address of the other router.</param>
         /// <param name="connectionFactory">Connection factory to use.</param>
         /// <param name="epochSize">Size of an epoch.</param>
-        public static void EnableDeduplication(this InterfaceConfiguration<SqlServerTransport> iface, string outgoingInterface, string destinationRouter, Func<SqlConnection> connectionFactory, int epochSize)
+        public static void EnableDeduplication(this InterfaceConfiguration iface, string outgoingInterface, string destinationRouter, Func<SqlConnection> connectionFactory, int epochSize)
         {
             var settings = iface.RouterConfiguration.Settings.GetOrCreate<DeduplicationSettings>();
             settings.EnableLink(iface.Name, outgoingInterface, destinationRouter, connectionFactory, epochSize);

@@ -7,7 +7,7 @@ class PreroutingToReplyPreroutingFork : IRule<PreroutingContext, PreroutingConte
 {
     public async Task Invoke(PreroutingContext context, Func<PreroutingContext, Task> next)
     {
-        if (context.Intent == MessageIntentEnum.Reply)
+        if (context.Intent == MessageIntent.Reply)
         {
             await context.Chains.Get<ReplyPreroutingContext>()
                 .Invoke(new ReplyPreroutingContext(context))

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using NServiceBus.Logging;
 using NServiceBus.Router;
@@ -15,6 +16,7 @@ class RouterImpl : IRouter
         this.interfaceChains = interfaceChains;
         this.extensibilitySettings = extensibilitySettings;
         this.interfaces = interfaces;
+        stopTokenSource = new CancellationTokenSource();
     }
 
     public async Task Initialize()
@@ -24,7 +26,7 @@ class RouterImpl : IRouter
             throw new Exception("The router has already been initialized.");
         }
 
-        rootContext = new RootContext(interfaceChains, name);
+        rootContext = new RootContext(interfaceChains, name, stopTokenSource.Token);
         await routingProtocol.Start(new RouterMetadata(name, interfaces.Select(i => i.Name).ToList())).ConfigureAwait(false);
 
         foreach (var iface in sendOnlyInterfaces)
@@ -60,6 +62,7 @@ class RouterImpl : IRouter
 
     public async Task Stop()
     {
+        stopTokenSource.Cancel();
         await Task.WhenAll(interfaces.Select(s => s.StopReceiving())).ConfigureAwait(false);
 
         //Stop modules in reverse order
@@ -85,4 +88,5 @@ class RouterImpl : IRouter
     SettingsHolder extensibilitySettings;
     static ILog log = LogManager.GetLogger<RouterImpl>();
     RootContext rootContext;
+    readonly CancellationTokenSource stopTokenSource;
 }

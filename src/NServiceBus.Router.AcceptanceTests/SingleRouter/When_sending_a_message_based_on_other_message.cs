@@ -1,7 +1,5 @@
 ﻿using System.Threading.Tasks;
 using NServiceBus.AcceptanceTesting;
-using NServiceBus.AcceptanceTests;
-using NServiceBus.AcceptanceTests.EndpointTemplates;
 using NUnit.Framework;
 
 namespace NServiceBus.Router.AcceptanceTests.SingleRouter
@@ -17,8 +15,8 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
                 {
-                    cfg.AddInterface<TestTransport>("Left", t => t.BrokerAlpha()).InMemorySubscriptions();
-                    cfg.AddInterface<TestTransport>("Right", t => t.BrokerBravo()).InMemorySubscriptions();
+                    cfg.AddInterface("Left", false).Broker().Alpha();
+                    cfg.AddInterface("Right", false).Broker().Bravo();
 
                     cfg.UseStaticRoutingProtocol().AddForwardRoute("Left", "Right");
                     cfg.UseStaticRoutingProtocol().AddForwardRoute("Right", "Left");
@@ -32,7 +30,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             Assert.IsTrue(result.ResponseReceived);
 
             //Ensure the correlation ID header to not grow forever
-            Assert.AreEqual(118, result.ReceivedCorrelationId.Length);
+            Assert.AreEqual(112, result.ReceivedCorrelationId.Length);
         }
 
         class Context : ScenarioContext
@@ -48,7 +46,10 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    var routing = c.UseTransport<TestTransport>().BrokerAlpha().Routing();
+                    c.ConfigureBroker().Alpha();
+                    c.ConfigureRouting().EnableMessageDrivenPubSubCompatibilityMode();
+
+                    var routing = c.ConfigureRouting();
                     var bridge = routing.ConnectToRouter("Router");
                     bridge.RouteToEndpoint(typeof(MyRequest), Conventions.EndpointNamingConvention(typeof(Receiver)));
                 });
@@ -78,7 +79,10 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    var routing = c.UseTransport<TestTransport>().BrokerBravo().Routing();
+                    c.ConfigureBroker().Bravo();
+                    c.ConfigureRouting().EnableMessageDrivenPubSubCompatibilityMode();
+
+                    var routing = c.ConfigureRouting();
                     var bridge = routing.ConnectToRouter("Router");
                     bridge.RouteToEndpoint(typeof(MyResponse), Conventions.EndpointNamingConvention(typeof(Sender)));
                 });

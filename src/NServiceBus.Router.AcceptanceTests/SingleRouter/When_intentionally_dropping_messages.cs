@@ -1,7 +1,5 @@
 ﻿using System.Threading.Tasks;
 using NServiceBus.AcceptanceTesting;
-using NServiceBus.AcceptanceTests;
-using NServiceBus.AcceptanceTests.EndpointTemplates;
 using NUnit.Framework;
 
 namespace NServiceBus.Router.AcceptanceTests.SingleRouter
@@ -17,8 +15,8 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", (ctx, cfg) =>
                 {
-                    cfg.AddInterface<TestTransport>("Left", t => t.BrokerAlpha()).InMemorySubscriptions();
-                    cfg.AddInterface<TestTransport>("Right", t => t.BrokerBravo()).InMemorySubscriptions();
+                    cfg.AddInterface("Left", false).Broker().Alpha();
+                    cfg.AddInterface("Right", false).Broker().Bravo();
 
                     cfg.UseStaticRoutingProtocol().AddForwardRoute("Left", "Right");
                     cfg.AddRule(_ => new CustomDestinationRule(ctx));
@@ -63,7 +61,9 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    var routing = c.UseTransport<TestTransport>().BrokerAlpha().Routing();
+                    c.ConfigureBroker().Alpha();
+
+                    var routing = c.ConfigureRouting();
                     var router = routing.ConnectToRouter("Router");
                     router.DelegateRouting(typeof(MyRequest));
                 });

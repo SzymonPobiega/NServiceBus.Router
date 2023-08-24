@@ -1,7 +1,5 @@
 ﻿using System.Threading.Tasks;
 using NServiceBus.AcceptanceTesting;
-using NServiceBus.AcceptanceTests;
-using NServiceBus.AcceptanceTests.EndpointTemplates;
 using NServiceBus.Features;
 using NUnit.Framework;
 
@@ -20,11 +18,12 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
                 {
-                    var left = cfg.AddInterface<TestTransport>("Left", t => t.BrokerAlpha()).InMemorySubscriptions();
+                    var left = cfg.AddInterface("Left", false);
+                    left.Broker().Alpha();
                     //To ensure when tracer arrives the subscribe request has already been processed.
                     left.LimitMessageProcessingConcurrencyTo(1);
 
-                    cfg.AddInterface<TestTransport>("Right", t => t.BrokerBravo()).InMemorySubscriptions();
+                    cfg.AddInterface("Right", false).Broker().Bravo();
 
                     cfg.UseStaticRoutingProtocol().AddForwardRoute("Right", "Left");
                 })
@@ -53,7 +52,8 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 EndpointSetup<DefaultServer>(c =>
                 {
                     //No bridge configuration needed for publisher
-                    c.UseTransport<TestTransport>().BrokerAlpha();
+                    c.ConfigureBroker().Alpha();
+                    c.ConfigureRouting().EnableMessageDrivenPubSubCompatibilityMode();
 
                     c.OnEndpointSubscribed<Context>((args, context) =>
                     {
@@ -85,8 +85,11 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
+                    c.ConfigureBroker().Bravo();
+                    c.ConfigureRouting().EnableMessageDrivenPubSubCompatibilityMode();
+
                     c.DisableFeature<AutoSubscribe>();
-                    var routing = c.UseTransport<TestTransport>().BrokerBravo().Routing();
+                    var routing = c.ConfigureRouting();
                     var bridge = routing.ConnectToRouter("Router");
                     bridge.RegisterPublisher(typeof(MyEvent), PublisherEndpoint);
                 });

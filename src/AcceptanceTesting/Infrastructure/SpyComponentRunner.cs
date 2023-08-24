@@ -1,26 +1,22 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using NServiceBus;
-using NServiceBus.AcceptanceTesting;
 using NServiceBus.AcceptanceTesting.Support;
 using NServiceBus.Raw;
 using NServiceBus.Transport;
 
 class SpyComponentRunner : ComponentRunner
 {
-    Action<TransportExtensions<TestTransport>> transportConfiguration;
-    Func<MessageContext, IDispatchMessages, Task> onMessage;
-    ScenarioContext scenarioContext;
+    TransportDefinition transportConfiguration;
+    Func<MessageContext, IMessageDispatcher, CancellationToken, Task> onMessage;
     string endpointName;
     IReceivingRawEndpoint endpoint;
 
-    public SpyComponentRunner(string endpointName, Action<TransportExtensions<TestTransport>> transportConfiguration,
-        Func<MessageContext, IDispatchMessages, Task> onMessage, ScenarioContext scenarioContext)
+    public SpyComponentRunner(string endpointName, TransportDefinition transportConfiguration,
+        Func<MessageContext, IMessageDispatcher, CancellationToken, Task> onMessage)
     {
         this.transportConfiguration = transportConfiguration;
         this.onMessage = onMessage;
-        this.scenarioContext = scenarioContext;
         this.endpointName = endpointName;
     }
 
@@ -28,12 +24,9 @@ class SpyComponentRunner : ComponentRunner
 
     public override async Task Start(CancellationToken token)
     {
-        var config = RawEndpointConfiguration.Create(endpointName, onMessage, "poison");
-        config.AutoCreateQueue();
-        config.Settings.Set<ScenarioContext>(scenarioContext);
+        var config = RawEndpointConfiguration.Create(endpointName, transportConfiguration, onMessage, "poison");
+        config.AutoCreateQueues();
         config.CustomErrorHandlingPolicy(new IgnoreErrorsPolicy());
-        var transport = config.UseTransport<TestTransport>();
-        transportConfiguration(transport);
 
         endpoint = await RawEndpoint.Start(config);
     }
@@ -47,7 +40,7 @@ class SpyComponentRunner : ComponentRunner
 
     class IgnoreErrorsPolicy : IErrorHandlingPolicy
     {
-        public Task<ErrorHandleResult> OnError(IErrorHandlingPolicyContext handlingContext, IDispatchMessages dispatcher)
+        public Task<ErrorHandleResult> OnError(IErrorHandlingPolicyContext handlingContext, IMessageDispatcher dispatcher, CancellationToken token)
         {
             return Task.FromResult(ErrorHandleResult.Handled);
         }

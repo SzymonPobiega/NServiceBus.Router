@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+	  <TargetFrameworks>net48;net6.0</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
@@ -13,9 +13,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="NServiceBus.Newtonsoft.Json" Version="2.0.0-*" />
-    <PackageReference Include="NServiceBus.AcceptanceTesting" Version="7.7.*" />
-    <PackageReference Include="NUnit" Version="3.12.0" />
+    <PackageReference Include="NServiceBus.Newtonsoft.Json" Version="3.0.*" />
+    <PackageReference Include="NServiceBus.AcceptanceTesting" Version="8.0.*" />
+    <PackageReference Include="NUnit" Version="3.13.3" />
   </ItemGroup>
 
   <ItemGroup>

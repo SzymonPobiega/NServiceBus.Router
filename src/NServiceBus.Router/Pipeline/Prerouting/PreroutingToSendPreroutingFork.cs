@@ -7,7 +7,7 @@ class PreroutingToSendPreroutingFork : IRule<PreroutingContext, PreroutingContex
 {
     public async Task Invoke(PreroutingContext context, Func<PreroutingContext, Task> next)
     {
-        if (context.Intent == MessageIntentEnum.Send)
+        if (context.Intent == MessageIntent.Send)
         {
             await context.Chains.Get<SendPreroutingContext>()
                 .Invoke(new SendPreroutingContext(context))

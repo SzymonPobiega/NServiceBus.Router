@@ -1,5 +1,7 @@
 ﻿namespace NServiceBus.Router
 {
+    using System;
+
     /// <summary>
     /// Defines the context for the forward reply chain.
     /// </summary>
@@ -23,6 +25,6 @@
         /// <summary>
         /// The headers associated with the received message.
         /// </summary>
-        public byte[] ReceivedBody { get; }
+        public ReadOnlyMemory<byte> ReceivedBody { get; }
     }
 }

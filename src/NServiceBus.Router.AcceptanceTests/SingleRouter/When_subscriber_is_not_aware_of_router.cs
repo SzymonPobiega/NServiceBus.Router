@@ -1,7 +1,5 @@
 ﻿using System.Threading.Tasks;
 using NServiceBus.AcceptanceTesting;
-using NServiceBus.AcceptanceTests;
-using NServiceBus.AcceptanceTests.EndpointTemplates;
 using NUnit.Framework;
 
 namespace NServiceBus.Router.AcceptanceTests.SingleRouter
@@ -18,8 +16,12 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
                 {
-                    cfg.AddInterface<TestTransport>("Left", t => t.BrokerAlpha()).InMemorySubscriptions();
-                    cfg.AddInterface<TestTransport>("Right", t => t.BrokerBravo()).InMemorySubscriptions();
+                    var left = cfg.AddInterface("Left", false);
+                    left.Broker().Alpha();
+                    left.InMemorySubscriptions();
+                    var right = cfg.AddInterface("Right", false);
+                    right.Broker().Bravo();
+                    right.InMemorySubscriptions();
 
                     cfg.UseStaticRoutingProtocol().AddForwardRoute("Right", "Left");
                     cfg.AddRule(_ => new PublisherRule());
@@ -54,7 +56,10 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                 EndpointSetup<DefaultServer>(c =>
                 {
                     //No bridge configuration needed for publisher
-                    c.UseTransport<TestTransport>().BrokerAlpha();
+                    c.ConfigureBroker().Alpha();
+
+                    var routing = c.ConfigureRouting();
+                    routing.EnableMessageDrivenPubSubCompatibilityMode();
 
                     c.OnEndpointSubscribed<Context>((args, context) =>
                     {
@@ -70,9 +75,12 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
             {
                 EndpointSetup<DefaultServer>(c =>
                 {
-                    var routing = c.UseTransport<TestTransport>().BrokerBravo().Routing();
+                    c.ConfigureBroker().Bravo();
+
+                    var routing = c.ConfigureRouting();
+
                     //Send Subscribe message to Router
-                    routing.RegisterPublisher(typeof(MyEvent), "Router");
+                    routing.EnableMessageDrivenPubSubCompatibilityMode().RegisterPublisher(typeof(MyEvent), "Router");
                 });
             }
 

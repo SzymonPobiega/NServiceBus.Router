@@ -34,7 +34,7 @@ class RouterAutoSubscribeBehavior : Behavior<IOutgoingPublishContext>
         foreach (var router in autoPublishRouters)
         {
             var subscriber = new Subscriber(router, null);
-            await subscriptionStorage.Subscribe(subscriber, new MessageType(messageType), new ContextBag()).ConfigureAwait(false);
+            await subscriptionStorage.Subscribe(subscriber, new MessageType(messageType), new ContextBag(), context.CancellationToken).ConfigureAwait(false);
         }
 
         cache.AddOrUpdate(messageType, true, (key, _) => true);

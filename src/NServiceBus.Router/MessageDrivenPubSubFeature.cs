@@ -35,8 +35,7 @@ class MessageDrivenPubSubFeature : IFeature
         {
             return context.Settings.Get<bool>(SettingsKey);
         }
-        var transport = context.Endpoint.Settings.Get<TransportInfrastructure>();
-        return transport.OutboundRoutingPolicy.Publishes == OutboundRoutingType.Unicast;
+        return context.Endpoint.SubscriptionManager == null;
     }
 
     static bool IsExplicitlyDisabled(IRuleCreationContext context)
@@ -47,7 +46,7 @@ class MessageDrivenPubSubFeature : IFeature
 
     static bool SendOnly(IRuleCreationContext context)
     {
-        return context.Endpoint.Settings.GetOrDefault<bool>("Endpoint.SendOnly");
+        return context.Endpoint.TransportAddress == null;
     }
 
     class ForwardPublishNullRule : ChainTerminator<ForwardPublishContext>

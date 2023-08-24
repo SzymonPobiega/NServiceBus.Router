@@ -4,16 +4,13 @@
     using Raw;
     using Routing;
     using Transport;
-    using Unicast.Subscriptions.MessageDrivenSubscriptions;
 
     /// <summary>
     /// Configures the switch port.
     /// </summary>
-    /// <typeparam name="T">Type of transport.</typeparam>
-    public class SendOnlyInterfaceConfiguration<T>
-        where T : TransportDefinition, new()
+    public class SendOnlyInterfaceConfiguration
     {
-        Action<TransportExtensions<T>> customization;
+        TransportDefinition transport;
         string overriddenEndpointName;
 
         /// <summary>
@@ -31,10 +28,10 @@
         /// </summary>
         public RouterConfiguration RouterConfiguration { get; }
 
-        internal SendOnlyInterfaceConfiguration(string name, Action<TransportExtensions<T>> customization, RouterConfiguration routerConfiguration)
+        internal SendOnlyInterfaceConfiguration(string name, TransportDefinition transport, RouterConfiguration routerConfiguration)
         {
+            this.transport = transport;
             Name = name;
-            this.customization = customization;
             RouterConfiguration = routerConfiguration;
         }
 
@@ -55,15 +52,6 @@
                 }
                 return condition(context) && context.InterfaceName == Name;
             });
-        }
-
-        /// <summary>
-        /// Configures the port to use specified subscription persistence.
-        /// </summary>
-        [Obsolete("Use EnableMessageDrivenPublishSubscribe instead.")]
-        public void UseSubscriptionPersistence(ISubscriptionStorage subscriptionStorage)
-        {
-            this.EnableMessageDrivenPublishSubscribe(subscriptionStorage);
         }
 
         /// <summary>
@@ -93,7 +81,7 @@
                 return new RuleCreationContext(Name, EndpointInstances, DistributionPolicy, e, typeGenerator, Settings);
             }
 
-            return new SendOnlyInterface<T>(overriddenEndpointName ?? endpointName, Name, customization, ContextFactory);
+            return new SendOnlyInterface(overriddenEndpointName ?? endpointName, Name, transport, ContextFactory);
         }
     }
 }

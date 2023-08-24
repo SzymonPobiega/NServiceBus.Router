@@ -1,5 +1,6 @@
 ﻿namespace NServiceBus.Router
 {
+    using System;
     using System.Collections.Generic;
 
     /// <summary>
@@ -26,6 +27,6 @@
         /// <summary>
         /// The body of the received message.
         /// </summary>
-        public byte[] Body { get; }
+        public ReadOnlyMemory<byte> Body { get; }
     }
 }

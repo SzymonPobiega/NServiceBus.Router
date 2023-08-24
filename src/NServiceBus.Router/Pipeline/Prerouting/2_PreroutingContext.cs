@@ -18,11 +18,11 @@
             Body = parent.Body;
             Intent = GetMessageIntent(parent.Headers);
         }
-        static MessageIntentEnum? GetMessageIntent(IReadOnlyDictionary<string, string> headers)
+        static MessageIntent? GetMessageIntent(IReadOnlyDictionary<string, string> headers)
         {
             if (headers.TryGetValue(NServiceBus.Headers.MessageIntent, out var messageIntentString))
             {
-                Enum.TryParse<MessageIntentEnum>(messageIntentString, true, out var messageIntent);
+                Enum.TryParse<MessageIntent>(messageIntentString, true, out var messageIntent);
                 return messageIntent;
             }
             return null;
@@ -31,12 +31,12 @@
         /// <summary>
         /// Received message intent or null if message intent header was missing.
         /// </summary>
-        public MessageIntentEnum? Intent { get; }
+        public MessageIntent? Intent { get; }
 
         /// <summary>
         /// The body of the received message.
         /// </summary>
-        public byte[] Body { get; set; }
+        public ReadOnlyMemory<byte> Body { get; set; }
 
         /// <summary>
         /// Mark this message as forwarded.
