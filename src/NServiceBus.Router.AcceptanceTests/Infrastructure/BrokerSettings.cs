@@ -31,7 +31,12 @@ namespace NServiceBus.Router.AcceptanceTests
         {
             SetStoragePath("Charlie");
         }
-        
+
+        public void Delta()
+        {
+            SetStoragePath("Delta");
+        }
+
         public void Yankee()
         {
             SetStoragePath("Yankee");
