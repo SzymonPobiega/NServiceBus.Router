@@ -3,8 +3,8 @@
     using System;
     using System.Threading.Tasks;
     using Metrics;
+    using Microsoft.Extensions.DependencyInjection;
     using NServiceBus;
-    using NServiceBus.Transport.SQLServer;
 
     class Program
     {
@@ -18,26 +18,25 @@
         static async Task Start()
         {
             var config = new EndpointConfiguration("Receiver");
-            config.UseSerialization<NewtonsoftSerializer>();
+            config.UseSerialization<NewtonsoftJsonSerializer>();
             config.SendFailedMessagesTo("error");
             config.EnableInstallers();
-            config.UsePersistence<InMemoryPersistence>();
+            config.UsePersistence<NonDurablePersistence>();
 
             Metric.Config.WithReporting(r =>
             {
                 r.WithCSVReports(".", TimeSpan.FromSeconds(5));
             });
 
-            config.RegisterComponents(c => c.RegisterSingleton(new Statistics()));
+            config.RegisterComponents(c => c.AddSingleton(new Statistics()));
 
             var connectionString = SettingsReader<string>.Read("SqlConnectionString", "data source=(local); initial catalog=loadtest; integrated security=true");
 
-            var senderTransport = config.UseTransport<SqlServerTransport>();
-            senderTransport.UseNativeDelayedDelivery().DisableTimeoutManagerCompatibility();
-            senderTransport.ConnectionString(connectionString);
-            senderTransport.Transactions(TransportTransactionMode.SendsAtomicWithReceive);
+            var transport = new SqlServerTransport(connectionString);
+            transport.TransportTransactionMode = TransportTransactionMode.SendsAtomicWithReceive;
+            var routing = config.UseTransport(transport);
 
-            senderTransport.Routing().RouteToEndpoint(typeof(ProcessingReport), "Sender");
+            routing.RouteToEndpoint(typeof(ProcessingReport), "Sender");
 
             endpointInstance = await Endpoint.Start(config);
             Console.WriteLine("Press <enter> to exit.");

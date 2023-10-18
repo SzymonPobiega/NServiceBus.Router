@@ -15,7 +15,7 @@ class ReportProcessingStatistics : FeatureStartupTask
         this.statistics = statistics;
     }
 
-    protected override Task OnStart(IMessageSession session)
+    protected override Task OnStart(IMessageSession session, CancellationToken token)
     {
         tokenSource = new CancellationTokenSource();
         reportTask = Task.Run(async () =>
@@ -40,7 +40,7 @@ class ReportProcessingStatistics : FeatureStartupTask
         return Task.CompletedTask;
     }
 
-    protected override async Task OnStop(IMessageSession session)
+    protected override async Task OnStop(IMessageSession session, CancellationToken token)
     {
         tokenSource?.Cancel();
         if (reportTask != null)

@@ -34,7 +34,8 @@ namespace NServiceBus.Router.AcceptanceTests
             await configurationBuilderCustomization(builder).ConfigureAwait(false);
 
             // scan types at the end so that all types used by the configuration have been loaded into the AppDomain
-            builder.TypesToIncludeInScan(endpointConfiguration.GetTypesScopedByTestClass());
+            builder.ScanTypesForTest(endpointConfiguration);
+            //builder.TypesToIncludeInScan(endpointConfiguration.GetTypesScopedByTestClass());
 
             return builder;
         }

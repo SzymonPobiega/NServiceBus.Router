@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using System.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using NServiceBus;
 using NServiceBus.Features;
@@ -30,7 +31,7 @@ class RouterConnectionFeature : Feature
             unicastRouteTable.AddOrReplaceRoutes("NServiceBus.Router_"+connection.RouterAddress, routes);
         }
 
-        if (!nativePubSub)
+        if (!nativePubSub || (context.Settings.TryGet("NServiceBus.Subscriptions.EnableMigrationMode", out bool enabled) && enabled))
         {
             //Register the auto-publish-to-router behavior
 

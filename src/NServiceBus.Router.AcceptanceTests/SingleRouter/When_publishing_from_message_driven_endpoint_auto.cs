@@ -21,7 +21,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                     a.Broker().Alpha();
 
                     var b = cfg.AddInterface("B", false);
-                    b.EnableMessageDrivenPublishSubscribe(alphaSubscriptionStore);
+                    b.EnableMessageDrivenPublishSubscribe(bravoSubscriptionStore);
                     b.Broker().Bravo();
 
                     cfg.AddInterface("C").Broker().Yankee();
@@ -73,7 +73,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                     var routing = c.ConfigureRouting();
 
                     routing.ConnectToRouter("Router", false, true);
-                });
+                }).IncludeType<InMemorySubscriptionPersistence>();
             }
         }
 
@@ -89,7 +89,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                     var routing = c.ConfigureRouting();
                     
                     routing.ConnectToRouter("Router", true, false);
-                });
+                }).IncludeType<InMemorySubscriptionPersistence>();
             }
 
             class BaseEventHandler : IHandleMessages<MyBaseEvent2>

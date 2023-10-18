@@ -7,12 +7,12 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
     using AcceptanceTesting.Customization;
 
     [TestFixture]
-    public class When_subscribing_from_native_and_message_driven_endpoints : NServiceBusAcceptanceTest
+    public class When_subscribing_from_native_and_message_driven : NServiceBusAcceptanceTest
     {
         static string PublisherEndpoint => Conventions.EndpointNamingConvention(typeof(Publisher));
 
         [Test]
-        public async Task It_should_deliver_the_message_to_both_subscribers()
+        public async Task It_should_deliver_the_message_to_both()
         {
             var result = await Scenario.Define<Context>()
                 .WithRouter("Router", cfg =>
@@ -25,7 +25,7 @@ namespace NServiceBus.Router.AcceptanceTests.SingleRouter
                     var a = cfg.AddInterface("A", false);
                     a.Broker().Alpha();
 
-                    //DerivedEventSubscriber - Broker C`
+                    //DerivedEventSubscriber - Broker C
                     cfg.AddInterface("C").Broker().Zulu();
 
                     var routeTable = cfg.UseStaticRoutingProtocol();
